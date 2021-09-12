@@ -1,19 +1,14 @@
 package edu.common.dynamicextensions.domain.nui;
 
+import edu.common.dynamicextensions.ndao.DbSettingsFactory;
+import edu.common.dynamicextensions.ndao.JdbcDaoFactory;
+import org.apache.commons.lang.StringUtils;
+
 import java.io.Serializable;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Collections;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
-
-import org.apache.commons.lang.StringUtils;
-
-import edu.common.dynamicextensions.ndao.DbSettingsFactory;
-import edu.common.dynamicextensions.ndao.JdbcDaoFactory;
 
 public class PvDataSource implements Serializable {
 	private static final long serialVersionUID = 276983397161935250L;
@@ -22,7 +17,9 @@ public class PvDataSource implements Serializable {
 
 	private static final String VALIDITY_QUERY = "select count(*) from (%s) t where t.%s = ?";
 
-	private static final String SEARCH_QUERY = "select * from (%s) t where upper(t.%s) like '%%%s%%'";
+	private static final String SEARCH_QUERY = "select * from (%s) t where %s";
+
+	private static final String SEARCH_CLAUSE = "upper(t.%s) like '%%%s%%'";
 
 	public enum Ordering {
 		NONE, ASC, DESC
@@ -115,25 +112,54 @@ public class PvDataSource implements Serializable {
 		return getPermissibleValues(Calendar.getInstance().getTime(), searchStr, maxPvs);
 	}
 
+	public List<PermissibleValue> getPermissibleValues(List<String> queries, int maxPvs) {
+		return getPermissibleValues(Calendar.getInstance().getTime(), queries, maxPvs);
+	}
+
 	public List<PermissibleValue> getPermissibleValues(Date activationDate, String searchStr, int maxPvs) {
+		List<String> queries = StringUtils.isNotBlank(searchStr) ? Collections.singletonList(searchStr) : null;
+		return getPermissibleValues(activationDate, queries, maxPvs);
+	}
+
+	public List<PermissibleValue> getPermissibleValues(Date activationDate, List<String> queries, int maxPvs) {
 		List<PermissibleValue> pvs;
 
 		if (sql != null) {
 			String searchSql = sql;
-			if (StringUtils.isNotBlank(searchStr)) {
-				searchSql = String.format(SEARCH_QUERY, sql, getColumnName(sql), searchStr.trim().toUpperCase());
+			if (queries != null && !queries.isEmpty()) {
+				String columnName = getColumnName(sql);
+				String searchClauses = queries.stream()
+					.map(query -> String.format(SEARCH_CLAUSE, columnName, query.trim().toUpperCase()))
+					.collect(Collectors.joining(" or "));
+				searchSql = String.format(SEARCH_QUERY, sql, searchClauses);
 			}
 
 			pvs = getPvsFromDb(searchSql, maxPvs);
 		} else {
 			pvs = getPvVersion(activationDate).getPermissibleValues();
 			sort(pvs);
+			if (queries != null && !queries.isEmpty()) {
+				List<PermissibleValue> result = new ArrayList<>();
+				int matchedPvs = 0;
+				for (String query : queries) {
+					if (matchedPvs >= maxPvs) {
+						break;
+					}
 
-			if (StringUtils.isNotBlank(searchStr)) {
-				pvs = pvs.stream()
-					.filter(pv -> pv.getValue().toLowerCase().contains(searchStr.toLowerCase()))
-					.limit(maxPvs)
-					.collect(Collectors.toList());
+					for (PermissibleValue pv : pvs) {
+						if (result.contains(pv) || !pv.getValue().toLowerCase().contains(query.toLowerCase())) {
+							continue;
+						}
+
+						result.add(pv);
+						++matchedPvs;
+						if (matchedPvs >= maxPvs) {
+							break;
+						}
+					}
+				}
+
+				pvs = result;
 			}
 		}
 
