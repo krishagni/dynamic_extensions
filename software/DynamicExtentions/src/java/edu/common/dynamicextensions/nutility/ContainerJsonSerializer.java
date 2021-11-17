@@ -37,6 +37,8 @@ public class ContainerJsonSerializer implements ContainerSerializer {
 
 		Map<String, Object> containerProps = container.getProps();
 		try {
+			containerProps.put("id", container.getId());
+
 			String json = new Gson().toJson(containerProps);
 			if (out != null) {
 				out.write(json.getBytes());
