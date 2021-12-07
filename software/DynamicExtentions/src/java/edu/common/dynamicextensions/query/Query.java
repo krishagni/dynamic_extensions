@@ -9,6 +9,7 @@ import java.util.stream.Collectors;
 
 import org.apache.log4j.Logger;
 
+import edu.common.dynamicextensions.ndao.JdbcDao;
 import edu.common.dynamicextensions.ndao.JdbcDaoFactory;
 import edu.common.dynamicextensions.ndao.ResultExtractor;
 import edu.common.dynamicextensions.query.ast.ConcatNode;
@@ -46,6 +47,8 @@ public class Query {
 	private Map<String, String> autoJoinParams;
 
 	private QuerySpace qs;
+
+	private int timeoutInSeconds = -1;
         
     public static Query createQuery() {
         return new Query();
@@ -112,6 +115,11 @@ public class Query {
     	return this;
 	}
 
+	public Query timeout(int timeout) {
+		this.timeoutInSeconds = timeout;
+		return this;
+	}
+
     public void compile(String rootFormName, String query) {
         compile(rootFormName, query, null);
     }
@@ -164,8 +172,10 @@ public class Query {
         gen.setAutoJoinParams(autoJoinParams);
         String countSql = gen.getCountSql(queryExpr, queryJoinTree);
 
-        long t1 = System.currentTimeMillis();            
-        long count = JdbcDaoFactory.getJdbcDao().getResultSet(countSql, null, new ResultExtractor<Long>() {
+        long t1 = System.currentTimeMillis();
+		JdbcDao jdbcDao = JdbcDaoFactory.getJdbcDao();
+		jdbcDao.setQueryTimeout(timeoutInSeconds);
+        long count = jdbcDao.getResultSet(countSql, null, new ResultExtractor<Long>() {
         	@Override
         	public Long extract(ResultSet rs) throws SQLException {
         		return rs.next() ? rs.getLong(1) : -1L;
@@ -188,8 +198,11 @@ public class Query {
     			!queryExpr.hasResultPostProc();
     	
         final String dataSql = getDataSql(wideRowSupport, start, numRows);        
-        final long t1 = System.currentTimeMillis();        
-        return JdbcDaoFactory.getJdbcDao().getResultSet(dataSql, null, new ResultExtractor<QueryResponse>() {
+        final long t1 = System.currentTimeMillis();
+
+		JdbcDao jdbcDao = JdbcDaoFactory.getJdbcDao();
+		jdbcDao.setQueryTimeout(timeoutInSeconds);
+        return jdbcDao.getResultSet(dataSql, null, new ResultExtractor<QueryResponse>() {
         	@Override
         	public QueryResponse extract(ResultSet rs)
         	throws SQLException {

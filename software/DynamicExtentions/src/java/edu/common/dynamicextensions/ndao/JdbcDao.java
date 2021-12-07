@@ -23,6 +23,10 @@ public class JdbcDao {
 	public JdbcDao(DataSource ds) {
 		jdbcTemplate = new JdbcTemplate(ds);
 	}
+
+	public void setQueryTimeout(int queryTimeout) {
+		jdbcTemplate.setQueryTimeout(queryTimeout);
+	}
 	
 	public <T> T getResultSet(final String query, final List<?> params, final ResultExtractor<T> extractor) {
 		Object[] paramArray = params != null ? params.toArray() : new Object[0];
