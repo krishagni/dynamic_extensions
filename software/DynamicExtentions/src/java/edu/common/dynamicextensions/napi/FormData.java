@@ -361,7 +361,7 @@ public class FormData {
 				}
 								
 				if (subFormData == null || subFormData.isEmpty()) {
-					subFormData = Collections.singletonList(new FormData(sfCtrl.getSubContainer()));
+					subFormData = Collections.emptyList();
 				}
 				
 				try {
