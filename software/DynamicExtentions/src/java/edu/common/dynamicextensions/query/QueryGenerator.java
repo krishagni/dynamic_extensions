@@ -142,7 +142,7 @@ public class QueryGenerator {
     		String dataSql = getDataSql(queryExpr, joinTree);
     		countSql.append("select count(*) from (").append(dataSql).append(")");    		
     	}
-    	
+
     	return countSql.toString();
     }
 
@@ -244,10 +244,14 @@ public class QueryGenerator {
     	for (ExpressionNode element : selectList.getElements()) {
     		String colAlias = "c" + colCnt;
     		element.setColumnAlias(colAlias);
+
+			String colSql = getExpressionNodeSql(element, element.getType());
+			if (element.getType() == DataType.BOOLEAN) {
+				colSql = "case (" + colSql + ") when 1 then 'Yes' else 'No' end";
+			}
     		
-    		select.append(getExpressionNodeSql(element, element.getType()))
-    			.append(" as ").append(colAlias).append(", ");
-    		colCnt++;    		    		
+    		select.append(colSql).append(" as ").append(colAlias).append(", ");
+    		colCnt++;
     	}
     	
     	if (select.length() == 0) {
@@ -802,7 +806,7 @@ public class QueryGenerator {
     			if (coercionType == DataType.DATE) {
     				result = getDateLiteralSql(result);
     			} else {
-    				result = "'" + StringEscapeUtils.escapeSql(result) + "'";
+    				result = "'" + escapeSql(result, false) + "'";
     			}
     			break;
     			
@@ -856,10 +860,34 @@ public class QueryGenerator {
     	    default:
     	    	break;
     	}
-    	
-    	String value = StringEscapeUtils.escapeSql(removeQuotes(stringNode.getValues().get(0).toString()));
-    	return "'" + prefix + value + suffix + "'";
+
+		String value = escapeSql(removeQuotes(stringNode.getValues().get(0).toString()), true);
+    	String filter = "'" + prefix + value + suffix + "'";
+		if (DbSettingsFactory.isOracle()) {
+			filter += " escape '\\' ";
+		}
+
+		return filter;
     }
+
+	private String escapeSql(String value, boolean like) {
+		value = StringEscapeUtils.escapeSql(value);
+		if (StringUtils.isBlank(value) || !like) {
+			return value;
+		}
+
+		if (DbSettingsFactory.isOracle()) {
+			value = value.replaceAll("\\\\\\\\", "\\\\\\\\")
+				.replaceAll("\\%", "\\\\%")
+				.replaceAll("\\_", "\\\\_");
+		} else {
+			value = value.replaceAll("\\\\\\\\", "\\\\\\\\\\\\")
+				.replaceAll("\\%", "\\\\%")
+				.replaceAll("\\_", "\\\\_");
+		}
+
+		return value;
+	}
         
     private String getArithExpressionNodeSql(ArithExpressionNode arithExpr) {    	
     	String expr = "";
