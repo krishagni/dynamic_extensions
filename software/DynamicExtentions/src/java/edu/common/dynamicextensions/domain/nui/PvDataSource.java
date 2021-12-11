@@ -19,7 +19,7 @@ public class PvDataSource implements Serializable {
 
 	private static final String SEARCH_QUERY = "select * from (%s) t where %s";
 
-	private static final String SEARCH_CLAUSE = "upper(t.%s) like '%%%s%%'";
+	private static final String SEARCH_CLAUSE = "upper(t.%s) like ?";
 
 	public enum Ordering {
 		NONE, ASC, DESC
@@ -83,7 +83,7 @@ public class PvDataSource implements Serializable {
 		List<PermissibleValue> pvs;
 		
 		if (sql != null) {
-			pvs = getPvsFromDb(sql, maxPvs);
+			pvs = getPvsFromDb(sql, null, maxPvs);
 		} else {
 			pvs = getPvVersion(activationDate).getPermissibleValues();
 			switch (ordering) {
@@ -129,12 +129,13 @@ public class PvDataSource implements Serializable {
 			if (queries != null && !queries.isEmpty()) {
 				String columnName = getColumnName(sql);
 				String searchClauses = queries.stream()
-					.map(query -> String.format(SEARCH_CLAUSE, columnName, query.trim().toUpperCase()))
+					.map(query -> String.format(SEARCH_CLAUSE, columnName))
 					.collect(Collectors.joining(" or "));
 				searchSql = String.format(SEARCH_QUERY, sql, searchClauses);
+				queries = queries.stream().map(query -> "%" + query.toUpperCase() + "%").collect(Collectors.toList());
 			}
 
-			pvs = getPvsFromDb(searchSql, maxPvs);
+			pvs = getPvsFromDb(searchSql, queries, maxPvs);
 		} else {
 			pvs = getPvVersion(activationDate).getPermissibleValues();
 			sort(pvs);
@@ -240,12 +241,12 @@ public class PvDataSource implements Serializable {
 		return result;		
 	}
 	
-	private List<PermissibleValue> getPvsFromDb(String sql, int maxPvs) {
+	private List<PermissibleValue> getPvsFromDb(String sql, List<String> queries, int maxPvs) {
 		if (maxPvs > 0) {
 			sql = getLimitQuery(sql, maxPvs);
 		}
 
-		return JdbcDaoFactory.getJdbcDao().getResultSet(sql, null, (rs) -> {
+		return JdbcDaoFactory.getJdbcDao().getResultSet(sql, queries, (rs) -> {
 			List<PermissibleValue> result = new ArrayList<>();
 
 			while (rs.next()) {
