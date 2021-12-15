@@ -1,26 +1,21 @@
 
 package edu.common.dynamicextensions.domain.nui;
 
-import static edu.common.dynamicextensions.nutility.XmlUtil.writeCDataElement;
-import static edu.common.dynamicextensions.nutility.XmlUtil.writeElement;
+import org.apache.commons.lang.StringUtils;
 
 import java.io.Serializable;
 import java.io.Writer;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.Set;
+import java.util.*;
 
-import org.apache.commons.lang.StringUtils;
-
-import edu.common.dynamicextensions.nui.ValidationRuleNames;
+import static edu.common.dynamicextensions.nutility.XmlUtil.writeCDataElement;
+import static edu.common.dynamicextensions.nutility.XmlUtil.writeElement;
 
 public abstract class Control implements Comparable<Control>, Serializable {
 	private static final long serialVersionUID = -1079013546686251896L;
+
+	private static final String VALIDATION_REQUIRED = "required";
+
+	private static final String VALIDATION_UNIQUE = "unique";
 
 	public enum LabelPosition {
 		LEFT_SIDE, TOP
@@ -141,19 +136,19 @@ public abstract class Control implements Comparable<Control>, Serializable {
 	}
 
 	public boolean isMandatory() {
-		return isRuleEnabled(ValidationRuleNames.REQUIRED);
+		return isRuleEnabled(VALIDATION_REQUIRED);
 	}
 
 	public void setMandatory(boolean mandatory) {
-		enableRule(mandatory, ValidationRuleNames.REQUIRED);
+		enableRule(mandatory, VALIDATION_REQUIRED);
 	}
 
 	public boolean isUnique() {
-		return isRuleEnabled(ValidationRuleNames.UNIQUE);
+		return isRuleEnabled(VALIDATION_UNIQUE);
 	}
 
 	public void setUnique(boolean unique) {
-		enableRule(unique, ValidationRuleNames.UNIQUE);
+		enableRule(unique, VALIDATION_UNIQUE);
 	}
 
 	public int getSequenceNumber() {
