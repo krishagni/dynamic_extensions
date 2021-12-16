@@ -3,12 +3,12 @@ package edu.common.dynamicextensions.query;
 import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.apache.log4j.Logger;
 
+import edu.common.dynamicextensions.nutility.LogUtil;
 import edu.common.dynamicextensions.query.cachestore.LinkedEhCacheMap;
 
 public class RowsList {
-	private static final Logger logger = Logger.getLogger(RowsList.class);
+	private static final LogUtil logger = LogUtil.getLogger(RowsList.class);
 
 	private static final AtomicInteger openCount = new AtomicInteger(0);
 

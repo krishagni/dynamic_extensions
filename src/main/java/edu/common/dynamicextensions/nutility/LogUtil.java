@@ -1,0 +1,64 @@
+package edu.common.dynamicextensions.nutility;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+public class LogUtil {
+    private Logger logger;
+
+    private LogUtil(Logger logger) {
+        this.logger = logger;
+    }
+
+    public static LogUtil getLogger(Class<?> klass) {
+        return new LogUtil(LogManager.getLogger(klass));
+    }
+
+    public void debug(String message) {
+        logger.debug(message);
+    }
+
+    public void debug(String message, Throwable t) {
+        logger.debug(message, t);
+    }
+
+    public void debug(String message, Object... params) {
+        logger.debug(message, params);
+    }
+
+    public void info(String message) {
+        logger.info(message);
+    }
+
+    public void info(String message, Throwable t) {
+        logger.info(message, t);
+    }
+
+    public void info(String message, Object... params) {
+        logger.info(message, params);
+    }
+
+    public void warn(String message) {
+        logger.warn(message);
+    }
+
+    public void warn(String message, Throwable t) {
+        logger.warn(message, t);
+    }
+
+    public void warn(String message, Object... params) {
+        logger.warn(message, params);
+    }
+
+    public void error(String message) {
+        logger.error(message);
+    }
+
+    public void error(String message, Throwable t) {
+        logger.error(message, t);
+    }
+
+    public void error(String message, Object... params) {
+        logger.error(message, params);
+    }
+}

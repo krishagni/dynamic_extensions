@@ -21,14 +21,13 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang.StringUtils;
-import org.apache.log4j.Logger;
-
 import com.google.gson.Gson;
 import com.thoughtworks.xstream.XStream;
 import com.thoughtworks.xstream.XStreamException;
 import com.thoughtworks.xstream.io.xml.DomDriver;
 import com.thoughtworks.xstream.security.AnyTypePermission;
 import com.thoughtworks.xstream.security.NoTypePermission;
+
 
 import edu.common.dynamicextensions.domain.nui.SkipCondition.RelationalOp;
 import edu.common.dynamicextensions.domain.nui.SkipRule.LogicalOp;
@@ -44,9 +43,10 @@ import edu.common.dynamicextensions.nutility.ContainerCache;
 import edu.common.dynamicextensions.nutility.ContainerParser;
 import edu.common.dynamicextensions.nutility.FormulaParser;
 import edu.common.dynamicextensions.nutility.IdGenerator;
+import edu.common.dynamicextensions.nutility.LogUtil;
 
 public class Container implements Serializable {
-	private static final Logger logger = Logger.getLogger(Container.class);
+	private static final LogUtil logger = LogUtil.getLogger(Container.class);
 
 	private static final long serialVersionUID = -6178237643696575798L;
 

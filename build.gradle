@@ -86,8 +86,6 @@ dependencies {
   compile group: 'commons-lang', name: 'commons-lang', version:'2.6'
   compile group: 'commons-logging', name: 'commons-logging', version:'1.2'
   compile group: 'commons-io', name: 'commons-io', version:'2.4'
-  compile group: 'org.slf4j', name: 'slf4j-api', version: '1.7.12'
-  compile group: 'log4j', name: 'log4j', version:'1.2.16'
 
   compile group: 'com.fasterxml', name: 'classmate', version: '1.4.0'
   compile group: 'com.fasterxml.jackson.core', name: 'jackson-annotations', version:'2.12.4'
@@ -99,6 +97,7 @@ dependencies {
   compile group: 'net.sf.ehcache', name: 'ehcache', version:'1.2.3'
   compile group: 'org.antlr', name: 'antlr4', version: '4.5.1'
   compile group: 'org.apache.commons', name: 'commons-digester3', version:'3.2'
+  compile group: 'org.apache.logging.log4j', name: 'log4j-api', version: '2.16.0'
 
   compile group: 'org.scijava', name: 'jep', version:'2.4.2'
 

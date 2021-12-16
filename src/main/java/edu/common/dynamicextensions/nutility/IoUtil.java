@@ -14,14 +14,13 @@ import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
-import org.apache.log4j.Logger;
 
 import au.com.bytecode.opencsv.CSVReader;
 import au.com.bytecode.opencsv.CSVWriter;
 import edu.common.dynamicextensions.napi.FormException;
 
 public class IoUtil {
-	private static final Logger logger = Logger.getLogger(IoUtil.class);
+	private static final LogUtil logger = LogUtil.getLogger(IoUtil.class);
 	
 	public static void close(Writer writer) {
 		if (writer != null) {

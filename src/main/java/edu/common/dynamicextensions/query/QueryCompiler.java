@@ -11,7 +11,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.log4j.Logger;
 
 import edu.common.dynamicextensions.domain.nui.Container;
 import edu.common.dynamicextensions.domain.nui.Control;
@@ -22,6 +21,7 @@ import edu.common.dynamicextensions.domain.nui.SubFormControl;
 import edu.common.dynamicextensions.napi.FormException;
 import edu.common.dynamicextensions.napi.VersionedContainer;
 import edu.common.dynamicextensions.napi.impl.VersionedContainerImpl;
+import edu.common.dynamicextensions.nutility.LogUtil;
 import edu.common.dynamicextensions.query.ast.AggregateNode;
 import edu.common.dynamicextensions.query.ast.ArithExpressionNode;
 import edu.common.dynamicextensions.query.ast.BetweenNode;
@@ -41,9 +41,8 @@ import edu.common.dynamicextensions.query.ast.QueryExpressionNode;
 import edu.common.dynamicextensions.query.ast.RoundOffNode;
 import edu.common.dynamicextensions.query.ast.SelectListNode;
 
-public class QueryCompiler
-{
-	private static final Logger logger = Logger.getLogger(QueryCompiler.class);
+public class QueryCompiler {
+    private static final LogUtil logger = LogUtil.getLogger(QueryCompiler.class);
 
     private int tabCnt;
     
