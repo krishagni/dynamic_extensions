@@ -144,7 +144,7 @@ public class ContainerDao {
 		Integer rowsDeleted = null;
 		
 		try {
-			Date deleteTime = Calendar.getInstance().getTime();
+			Timestamp deleteTime = new Timestamp(Calendar.getInstance().getTimeInMillis());
 			List<Object> params = new ArrayList<>();
 			String sql = null;
 			if (softDelete) {
