@@ -28,7 +28,6 @@ import com.thoughtworks.xstream.io.xml.DomDriver;
 import com.thoughtworks.xstream.security.AnyTypePermission;
 import com.thoughtworks.xstream.security.NoTypePermission;
 
-
 import edu.common.dynamicextensions.domain.nui.SkipCondition.RelationalOp;
 import edu.common.dynamicextensions.domain.nui.SkipRule.LogicalOp;
 import edu.common.dynamicextensions.napi.FormEventsNotifier;
@@ -860,12 +859,13 @@ public class Container implements Serializable {
 				dao.update(userCtxt, this);
 				FormEventsNotifier.getInstance().notifyUpdate(this);
 			}
-			
-			ContainerCache.getInstance().remove(id);
+
 			return id;			
 		} catch (Exception e) {
 			throw new FormException("Error saving container", e);
-		} 
+		} finally {
+			ContainerCache.getInstance().remove(id);
+		}
 	}
 	
 	public static boolean deleteContainer(UserContext userCtxt, Long id) {
@@ -994,14 +994,23 @@ public class Container implements Serializable {
 	}
 
 	public static Long createContainer(UserContext ctxt, Container parsedContainer, boolean createTables) {
+		ContainerDao dao = new ContainerDao(JdbcDaoFactory.getJdbcDao());
 		Container existingContainer = null;		
 		if (parsedContainer.getId() != null) {
-			existingContainer = getContainer(parsedContainer.getId());
+			try {
+				existingContainer = dao.getById(parsedContainer.getId());
+			} catch (SQLException e) {
+				throw new FormException("Error retrieving the form by ID: " + parsedContainer.getId() + ", " + e.getMessage(), e);
+			}
 		}
 		
 		if (existingContainer == null) { 
 			if (parsedContainer.getName() != null) {
-				existingContainer = getContainer(parsedContainer.getName());
+				try {
+					existingContainer = dao.getByName(parsedContainer.getName());
+				} catch (SQLException e) {
+					throw new FormException("Error retrieving the form by name: " + parsedContainer.getName() + ", " + e.getMessage(), e);
+				}
 			}
 		}
 		

@@ -64,6 +64,10 @@ public class ContainerCache {
 	}
 
 	public Container remove(Long id) {
+		if (id == null) {
+			return null;
+		}
+
 		Container form = cacheMap.remove(id);
 		if (form != null) {
 			nameToIdsMap.remove(form.getName());
