@@ -80,6 +80,29 @@ public class ContainerParser {
 	
 	public Container parse(InputStream formIn) throws Exception {		
 		DocumentBuilderFactory docFactory = DocumentBuilderFactory.newInstance();
+
+		// Ref: https://cheatsheetseries.owasp.org/cheatsheets/XML_External_Entity_Prevention_Cheat_Sheet.html
+		// 1. disable DTDs
+		String feature = "http://apache.org/xml/features/disallow-doctype-decl";
+		docFactory.setFeature(feature, true);
+
+
+		// 2. disable external entities to prevent XXE
+		feature = "http://xml.org/sax/features/external-general-entities";
+		docFactory.setFeature(feature, false);
+
+		// 3. disable external entity parameters to prevent XXE
+		feature = "http://xml.org/sax/features/external-parameter-entities";
+		docFactory.setFeature(feature, false);
+
+		// 4. disable external DTDs as well
+		feature = "http://apache.org/xml/features/nonvalidating/load-external-dtd";
+		docFactory.setFeature(feature, false);
+
+		// 5. disable XML inclusions and entity expansions
+		docFactory.setXIncludeAware(false);
+		docFactory.setExpandEntityReferences(false);
+
 		DocumentBuilder docBuilder = docFactory.newDocumentBuilder();
 		Document doc = docBuilder.parse(formIn);
 		doc.getDocumentElement().normalize();
