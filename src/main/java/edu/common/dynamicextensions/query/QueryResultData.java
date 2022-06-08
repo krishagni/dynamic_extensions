@@ -217,9 +217,7 @@ public class QueryResultData {
                 for (int i = 0; i < columnCount; ++i) {
 					ExpressionNode expr = resultColumns.get(i).getExpression();
                     row[i] = rs.getObject(i + 1);
-                    if (row[i] instanceof Date) {
-						row[i] = rs.getTimestamp(i + 1);
-                    } else if (expr instanceof AggregateNode && ((AggregateNode) expr).isCumulative()) {
+                    if (expr instanceof AggregateNode && ((AggregateNode) expr).isCumulative()) {
 						BigDecimal existing = cumulative.get(i);
 						if (existing == null) {
 							existing = BigDecimal.ZERO;

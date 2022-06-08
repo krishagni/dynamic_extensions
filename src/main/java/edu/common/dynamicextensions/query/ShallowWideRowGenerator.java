@@ -326,10 +326,7 @@ public class ShallowWideRowGenerator {
             }
             
             Object obj = rs.getObject(col);
-            if (obj instanceof Date) {
-            	obj = rs.getTimestamp(col);
-            }            
-            columns.add(new ResultColumn(element, obj));         
+            columns.add(new ResultColumn(element, obj));
         }
         
         return aliasColumnValuesMap;
