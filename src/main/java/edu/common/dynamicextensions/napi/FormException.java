@@ -9,8 +9,8 @@ public class FormException extends RuntimeException {
 	}
 
 	public FormException(String error, Throwable t) {
-		super(error, t);
-		this.error = error;
+		super(t != null ? error + ": " + t.getMessage() : error, t);
+		this.error = t != null ? error + ": " + t.getMessage() : error;
 	}
 
 	public String getError() {
