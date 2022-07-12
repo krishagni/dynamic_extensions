@@ -418,8 +418,8 @@ public class QueryResultData {
 		}
 
 		ResultColumn col = null;
-		if (columnIdx < resultColumns.size()) {
-			col = resultColumns.get(columnIdx);
+		if (columnIdx < getResultColumns().size()) {
+			col = getResultColumns().get(columnIdx);
 		}
 
 		boolean strictlyDate = false;
