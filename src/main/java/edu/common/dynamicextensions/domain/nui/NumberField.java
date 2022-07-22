@@ -1,10 +1,6 @@
 
 package edu.common.dynamicextensions.domain.nui;
 
-import static edu.common.dynamicextensions.nutility.XmlUtil.writeElement;
-import static edu.common.dynamicextensions.nutility.XmlUtil.writeElementEnd;
-import static edu.common.dynamicextensions.nutility.XmlUtil.writeElementStart;
-
 import java.io.Serializable;
 import java.io.Writer;
 import java.math.BigDecimal;
@@ -19,6 +15,10 @@ import org.apache.commons.lang.StringUtils;
 
 import edu.common.dynamicextensions.napi.FormException;
 import edu.common.dynamicextensions.ndao.ColumnTypeHelper;
+
+import static edu.common.dynamicextensions.nutility.XmlUtil.writeElement;
+import static edu.common.dynamicextensions.nutility.XmlUtil.writeElementEnd;
+import static edu.common.dynamicextensions.nutility.XmlUtil.writeElementStart;
 
 public class NumberField extends TextField implements Serializable {
 	private static final long serialVersionUID = 1205899623349158320L;
@@ -262,9 +262,9 @@ public class NumberField extends TextField implements Serializable {
 			
 			for (Entry<String, String> ruleParam : valRule.getParams().entrySet()) {
 				String prop = "";
-				if (ruleParam.equals("min")) {
+				if ("min".equals(ruleParam.getKey())) {
 					prop = "minValue";
-				} else if (ruleParam.equals("max")) {
+				} else if ("max".equals(ruleParam.getKey())) {
 					prop = "maxValue";
 				} 
 				
