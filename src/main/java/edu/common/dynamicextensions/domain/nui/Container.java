@@ -27,6 +27,9 @@ import com.thoughtworks.xstream.XStreamException;
 import com.thoughtworks.xstream.io.xml.DomDriver;
 import com.thoughtworks.xstream.security.AnyTypePermission;
 import com.thoughtworks.xstream.security.NoTypePermission;
+import com.thoughtworks.xstream.security.NullPermission;
+import com.thoughtworks.xstream.security.PrimitiveTypePermission;
+import com.thoughtworks.xstream.security.TypePermission;
 
 import edu.common.dynamicextensions.domain.nui.SkipCondition.RelationalOp;
 import edu.common.dynamicextensions.domain.nui.SkipRule.LogicalOp;
@@ -1380,15 +1383,40 @@ public class Container implements Serializable {
 			XStream xstream = new XStream(new DomDriver());
 			xstream.setMode(XStream.ID_REFERENCES);
 			xstream.addPermission(NoTypePermission.NONE);
-			xstream.addPermission(AnyTypePermission.ANY);
+			xstream.addPermission(NullPermission.NULL);
+			xstream.addPermission(PrimitiveTypePermission.PRIMITIVES);
+			xstream.allowTypeHierarchy(Collection.class);
+			xstream.allowTypeHierarchy(Map.class);
+			xstream.addPermission(new TypePermission() {
+				@Override
+				public boolean allows(Class type) {
+					return Container.class.isAssignableFrom(type) ||
+						Control.class.isAssignableFrom(type) ||
+						DataType.class.isAssignableFrom(type) ||
+						Layout.class.isAssignableFrom(type) ||
+						Map.class.isAssignableFrom(type) ||
+						Page.class.isAssignableFrom(type) ||
+						PageField.class.isAssignableFrom(type) ||
+						PageRow.class.isAssignableFrom(type) ||
+						PermissibleValue.class.isAssignableFrom(type) ||
+						PvDataSource.class.isAssignableFrom(type) ||
+						PvVersion.class.isAssignableFrom(type) ||
+						SkipAction.class.isAssignableFrom(type) ||
+						SkipCondition.class.isAssignableFrom(type) ||
+						SkipLogic.class.isAssignableFrom(type) ||
+						SkipRule.class.isAssignableFrom(type) ||
+						String.class.isAssignableFrom(type) ||
+						ValidationRule.class.isAssignableFrom(type) ||
+						ValidationRuleParam.class.isAssignableFrom(type);
+				}
+			});
 
 			setUpAliases(xstream);
-
 			Container container = (Container)xstream.fromXML(xml);
 			container.initLogs(); // for some reason, xstream is not initializing add/edit/deleteLogs of container
 			return container;
 		} catch (XStreamException xse) {
-			throw new FormException("Error parsing container definition: " + xse.getMessage());
+			throw new FormException("Error parsing container definition: " + xse.getMessage(), xse);
 		}
 	}
 	
