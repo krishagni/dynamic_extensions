@@ -14,6 +14,8 @@ import edu.common.dynamicextensions.domain.nui.PermissibleValue;
 import edu.common.dynamicextensions.napi.FormException;
 
 public class ParserUtil {
+	private static final LogUtil logger = LogUtil.getLogger(ParserUtil.class);
+
 	public static Long getLongValue(Element element, String name) {
 		String value = getTextValue(element, name);
 		if (value == null || value.trim().isEmpty()) {
@@ -128,14 +130,20 @@ public class ParserUtil {
 		return pvs;
 	}
 	
-	public static List<PermissibleValue> getPermissibleValueFromFile(String pvDir, String optionsFile) {
+	public static List<PermissibleValue> getPermissibleValueFromFile(String pvDir, String optionsFilePath) {
 		FileReader reader = null;
 		CSVReader csvReader = null;		
 		try {
 			List<PermissibleValue> pvs = new ArrayList<PermissibleValue>();
-			
-			String filePath = pvDir + File.separator + optionsFile;			
-			reader = new FileReader(filePath);			
+
+			File optionsFile = new File(pvDir, optionsFilePath);
+			if (!optionsFile.getCanonicalPath().equals(optionsFile.getAbsolutePath())) {
+				logger.error("Path traversal detected. Options file path: " + optionsFilePath + " is not allowed. " +
+					"Canonical Path: *" + optionsFile.getCanonicalPath() + "*, Absolute Path: *" + optionsFile.getAbsolutePath() + "*");
+				throw new FormException("Path traversal detected. Options file path: " + optionsFilePath + " is not allowed.");
+			}
+
+			reader = new FileReader(optionsFile);
 			csvReader = new CSVReader(reader);
 			String[] option = null;
 
@@ -161,7 +169,12 @@ public class ParserUtil {
 			}
 			return pvs;
 		} catch (Exception e) {
-			throw new FormException ("Error reading options file: " + optionsFile, e);
+			if (e instanceof FormException) {
+				throw (FormException) e;
+			}
+
+			logger.error("Error reading options file: " + optionsFilePath, e);
+			throw new FormException ("Error reading options file: " + optionsFilePath, e);
 		} finally {
 			IoUtil.close(csvReader);
 			IoUtil.close(reader);
