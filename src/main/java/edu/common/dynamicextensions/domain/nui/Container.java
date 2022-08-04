@@ -26,6 +26,7 @@ import com.thoughtworks.xstream.XStream;
 import com.thoughtworks.xstream.XStreamException;
 import com.thoughtworks.xstream.io.xml.DomDriver;
 import com.thoughtworks.xstream.security.AnyTypePermission;
+import com.thoughtworks.xstream.security.ArrayTypePermission;
 import com.thoughtworks.xstream.security.NoTypePermission;
 import com.thoughtworks.xstream.security.NullPermission;
 import com.thoughtworks.xstream.security.PrimitiveTypePermission;
@@ -1385,6 +1386,7 @@ public class Container implements Serializable {
 			xstream.addPermission(NoTypePermission.NONE);
 			xstream.addPermission(NullPermission.NULL);
 			xstream.addPermission(PrimitiveTypePermission.PRIMITIVES);
+			xstream.addPermission(ArrayTypePermission.ARRAYS);
 			xstream.allowTypeHierarchy(Collection.class);
 			xstream.allowTypeHierarchy(Map.class);
 			xstream.addPermission(new TypePermission() {
@@ -1395,6 +1397,7 @@ public class Container implements Serializable {
 						DataType.class.isAssignableFrom(type) ||
 						Layout.class.isAssignableFrom(type) ||
 						Map.class.isAssignableFrom(type) ||
+						PvDataSource.Ordering.class.isAssignableFrom(type) ||
 						Page.class.isAssignableFrom(type) ||
 						PageField.class.isAssignableFrom(type) ||
 						PageRow.class.isAssignableFrom(type) ||
@@ -1416,6 +1419,7 @@ public class Container implements Serializable {
 			container.initLogs(); // for some reason, xstream is not initializing add/edit/deleteLogs of container
 			return container;
 		} catch (XStreamException xse) {
+			logger.error("Error parsing the following container definition: \n" + xml);
 			throw new FormException("Error parsing container definition: " + xse.getMessage(), xse);
 		}
 	}
