@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<databaseChangeLog
+  xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+  http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-2.0.xsd">
+
+  <changeSet author="vpawar" id="Track IP address of user who effected the form change">
+    <addColumn tableName="DYEXTN_CONTAINERS_AUD">
+      <column name="IP_ADDRESS" type="${string.type}(255)" />
+    </addColumn>
+  </changeSet>
+</databaseChangeLog>

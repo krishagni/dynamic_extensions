@@ -27,15 +27,15 @@ public class ContainerDao {
 
 	private static final String INSERT_CONTAINER_AUD_SQL_MYSQL =
 		"INSERT INTO DYEXTN_CONTAINERS_AUD " +
-			"(REV, REV_TYPE, REV_BY, REV_TIME, IDENTIFIER, NAME, CAPTION, DELETED_ON, XML) " +
+			"(REV, REV_TYPE, REV_BY, REV_TIME, IP_ADDRESS, IDENTIFIER, NAME, CAPTION, DELETED_ON, XML) " +
 		"VALUES " +
-			"(default, ?, ?, ?, ?, ?, ?, ?, ?)";
+			"(default, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
 	private static final String INSERT_CONTAINER_AUD_SQL_ORA =
 		"INSERT INTO DYEXTN_CONTAINERS_AUD " +
-			"(REV, REV_TYPE, REV_BY, REV_TIME, IDENTIFIER, NAME, CAPTION, DELETED_ON, XML) " +
+			"(REV, REV_TYPE, REV_BY, REV_TIME, IP_ADDRESS, IDENTIFIER, NAME, CAPTION, DELETED_ON, XML) " +
 		"VALUES " +
-			"(DYEXTN_CONTAINERS_AUD_SEQ.nextval, ?, ?, ?, ?, ?, ?, ?, empty_blob())";
+			"(DYEXTN_CONTAINERS_AUD_SEQ.nextval, ?, ?, ?, ?, ?, ?, ?, ?, empty_blob())";
 
 	private static final String UPDATE_CONTAINER_SQL_MYSQL = 
 			"UPDATE DYEXTN_CONTAINERS SET NAME = ?, CAPTION = ?, LAST_MODIFIED_BY = ?, LAST_MODIFY_TIME = ?, XML = ? " +
@@ -213,6 +213,7 @@ public class ContainerDao {
 		params.add(revType);
 		params.add(userCtx != null ? userCtx.getUserId() : null);
 		params.add(opTime);
+		params.add(userCtx != null ? userCtx.getIpAddress() : null);
 		params.add(container.getId());
 		params.add(container.getName());
 		params.add(container.getCaption());
