@@ -2,7 +2,7 @@ package edu.common.dynamicextensions.domain.nui;
 
 import java.io.Serializable;
 
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 
 public class PermissibleValue  implements Comparable<PermissibleValue>, Serializable{
 	private static final long serialVersionUID = -2798378925431518758L;

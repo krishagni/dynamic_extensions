@@ -11,7 +11,7 @@ import java.io.Writer;
 import java.util.Map;
 import java.util.Properties;
 
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 
 public abstract class TextField extends Control implements Serializable {
 	private static final long serialVersionUID = 5296516560573054446L;

@@ -14,8 +14,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.apache.commons.lang.StringEscapeUtils;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 
 import edu.common.dynamicextensions.domain.nui.Container;
 import edu.common.dynamicextensions.domain.nui.Control;
@@ -871,7 +870,10 @@ public class QueryGenerator {
     }
 
 	private String escapeSql(String value, boolean like) {
-		value = StringEscapeUtils.escapeSql(value);
+		if (value != null) {
+			value = StringUtils.replace(value, "'", "''");
+		}
+
 		if (StringUtils.isBlank(value) || !like) {
 			return value;
 		}
@@ -1171,7 +1173,7 @@ public class QueryGenerator {
 		List<ExpressionNode> args = concatNode.getArgs();
 
 		if (concatNode.getSeparator() != null) {
-			String separator = "'" + StringEscapeUtils.escapeSql(removeQuotes(concatNode.getSeparator())) + "'";
+			String separator = "'" + escapeSql(removeQuotes(concatNode.getSeparator()), false) + "'";
 			if (DbSettingsFactory.isOracle()) {
 				concatFn = "concat(de_concat_if_not_null(";
 				exprSeparator = ", " + separator + "), ";

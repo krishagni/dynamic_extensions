@@ -2,7 +2,7 @@ package edu.common.dynamicextensions.domain.nui;
 
 import edu.common.dynamicextensions.ndao.DbSettingsFactory;
 import edu.common.dynamicextensions.ndao.JdbcDaoFactory;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 
 import java.io.Serializable;
 import java.sql.ResultSet;
