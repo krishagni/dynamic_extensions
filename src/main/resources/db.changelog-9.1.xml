@@ -11,4 +11,10 @@
       <column name="IP_ADDRESS" type="${string.type}(255)" />
     </addColumn>
   </changeSet>
+
+  <changeSet author="vpawar" id="Track the fields that were added / modified / deleted when editing the form">
+    <addColumn tableName="DYEXTN_CONTAINERS_AUD">
+      <column name="MODIFIED_PROPS" type="${clob.type}" />
+    </addColumn>
+  </changeSet>
 </databaseChangeLog>

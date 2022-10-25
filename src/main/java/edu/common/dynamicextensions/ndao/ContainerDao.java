@@ -1,7 +1,10 @@
 package edu.common.dynamicextensions.ndao;
 
+import java.io.IOException;
 import java.io.OutputStream;
+import java.io.Writer;
 import java.sql.Blob;
+import java.sql.Clob;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -10,6 +13,9 @@ import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
+
+import com.google.gson.Gson;
 
 import edu.common.dynamicextensions.domain.nui.Container;
 import edu.common.dynamicextensions.domain.nui.ContainerInfo;
@@ -27,15 +33,15 @@ public class ContainerDao {
 
 	private static final String INSERT_CONTAINER_AUD_SQL_MYSQL =
 		"INSERT INTO DYEXTN_CONTAINERS_AUD " +
-			"(REV, REV_TYPE, REV_BY, REV_TIME, IP_ADDRESS, IDENTIFIER, NAME, CAPTION, DELETED_ON, XML) " +
+			"(REV, REV_TYPE, REV_BY, REV_TIME, IP_ADDRESS, IDENTIFIER, NAME, CAPTION, DELETED_ON, XML, MODIFIED_PROPS) " +
 		"VALUES " +
-			"(default, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+			"(default, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
 	private static final String INSERT_CONTAINER_AUD_SQL_ORA =
 		"INSERT INTO DYEXTN_CONTAINERS_AUD " +
-			"(REV, REV_TYPE, REV_BY, REV_TIME, IP_ADDRESS, IDENTIFIER, NAME, CAPTION, DELETED_ON, XML) " +
+			"(REV, REV_TYPE, REV_BY, REV_TIME, IP_ADDRESS, IDENTIFIER, NAME, CAPTION, DELETED_ON, XML, MODIFIED_PROPS) " +
 		"VALUES " +
-			"(DYEXTN_CONTAINERS_AUD_SEQ.nextval, ?, ?, ?, ?, ?, ?, ?, ?, empty_blob())";
+			"(DYEXTN_CONTAINERS_AUD_SEQ.nextval, ?, ?, ?, ?, ?, ?, ?, ?, empty_blob(), empty_clob())";
 
 	private static final String UPDATE_CONTAINER_SQL_MYSQL = 
 			"UPDATE DYEXTN_CONTAINERS SET NAME = ?, CAPTION = ?, LAST_MODIFIED_BY = ?, LAST_MODIFY_TIME = ?, XML = ? " +
@@ -55,6 +61,9 @@ public class ContainerDao {
 			"DYEXTN_CONTAINERS_AUD " +
 		"WHERE " +
 			"REV = ?";
+
+	private static final String GET_CONTAINER_PROPS_AUD_BY_REV =
+		"SELECT MODIFIED_PROPS FROM DYEXTN_CONTAINERS_AUD WHERE REV = ?";
 	
 	private static final String GET_CONTAINER_XML_BY_NAME_SQL = "SELECT XML, CREATED_BY, CREATE_TIME, LAST_MODIFIED_BY, LAST_MODIFY_TIME"
 			+ " FROM DYEXTN_CONTAINERS WHERE NAME = ? AND DELETED_ON IS NULL";
@@ -97,7 +106,7 @@ public class ContainerDao {
 		return ids;
 	}
 	
-	public void insert(UserContext userCtxt, Container c) 
+	public void insert(UserContext userCtxt, Container c, Map<String, Object> props)
 	throws SQLException {
 		List<Object> params = new ArrayList<Object>();	
 		params.add(c.getId());
@@ -114,11 +123,11 @@ public class ContainerDao {
 			jdbcDao.executeUpdate(INSERT_CONTAINER_SQL_MYSQL, params);	
 		}
 
-		addContainerRev(0, c, userCtxt, createTime);
+		addContainerRev(0, c, userCtxt, createTime, props);
 	}
 	
 	
-	public void update(UserContext userCtxt, Container c) 
+	public void update(UserContext userCtxt, Container c, Map<String, Object> props)
 	throws SQLException {		
 		List<Object> params = new ArrayList<Object>();				
 		params.add(c.getName());
@@ -137,7 +146,7 @@ public class ContainerDao {
 			jdbcDao.executeUpdate(UPDATE_CONTAINER_SQL_MYSQL, params);	
 		}
 
-		addContainerRev(1, c, userCtxt, updateTime);
+		addContainerRev(1, c, userCtxt, updateTime, props);
 	}
 	
 	public boolean delete(UserContext userCtxt, Container c, boolean softDelete) {
@@ -158,7 +167,7 @@ public class ContainerDao {
 			
 			rowsDeleted = jdbcDao.executeUpdate(sql, params);
 			if (rowsDeleted != null && rowsDeleted > 0) {
-				addContainerRev(2, c, userCtxt, deleteTime);
+				addContainerRev(2, c, userCtxt, deleteTime, null);
 			}
 		} catch (Exception e) {
 			throw new FormException("Error deleting form", e);
@@ -208,7 +217,11 @@ public class ContainerDao {
 		return jdbcDao.getResultSet(GET_CONTAINER_INFO_BY_CREATOR_SQL, params, containerInfoExtractor);
 	}
 
-	private void addContainerRev(int revType, Container container, UserContext userCtx, Date opTime) {
+	private void addContainerRev(int revType, Container container, UserContext userCtx, Date opTime, Map<String, Object> props) {
+		if ((revType == 0 || revType == 1) && (props == null || props.isEmpty())) {
+			return;
+		}
+
 		List<Object> params = new ArrayList<>();
 		params.add(revType);
 		params.add(userCtx != null ? userCtx.getUserId() : null);
@@ -219,13 +232,18 @@ public class ContainerDao {
 		params.add(container.getCaption());
 		params.add(revType == 2 ? opTime : null);
 
+		String modifiedPropsJson = props != null ? new Gson().toJson(props) : null;
 		if (DbSettingsFactory.isOracle()) {
 			Number rev = jdbcDao.executeUpdateAndGetKey(INSERT_CONTAINER_AUD_SQL_ORA, params, "REV");
 			updateContainerXml(GET_CONTAINER_XML_AUD_BY_REV, rev.longValue(), container.toXml());
+			updateContainerProps(rev.longValue(), modifiedPropsJson);
 		} else {
 			params.add(container.toXml());
+			params.add(modifiedPropsJson);
 			jdbcDao.executeUpdate(INSERT_CONTAINER_AUD_SQL_MYSQL, params);
 		}
+
+		System.err.println(modifiedPropsJson);
 	}
 
 	private void updateContainerXml(String sql, Long id, final String xml) {
@@ -248,6 +266,26 @@ public class ContainerDao {
 		} catch (Exception e) {
 			throw new FormException("Error writing blob", e);
 		}
+	}
+
+	private void updateContainerProps(Long id, final String json) {
+		if (json == null || json.isEmpty()) {
+			return;
+		}
+
+		jdbcDao.getResultSet(GET_CONTAINER_PROPS_AUD_BY_REV + " FOR UPDATE", Collections.singletonList(id), new ResultExtractor<Object>() {
+			@Override
+			public Object extract(ResultSet rs) throws SQLException {
+				rs.next();
+				Clob clob = rs.getClob("MODIFIED_PROPS");
+				try (Writer writer = clob.setCharacterStream(0)) {
+					writer.write(json);
+				} catch (IOException e) {
+					throw new FormException("Error writing form modified props", e);
+				}
+				return null;
+			}
+		});
 	}
 
 //	public List<NameValueBean> listAllContainerIdAndName() throws SQLException {

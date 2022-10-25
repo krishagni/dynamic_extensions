@@ -1,11 +1,20 @@
 
 package edu.common.dynamicextensions.domain.nui;
 
-import org.apache.commons.lang3.StringUtils;
-
 import java.io.Serializable;
 import java.io.Writer;
-import java.util.*;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Properties;
+import java.util.Set;
+
+import org.apache.commons.lang3.StringUtils;
 
 import static edu.common.dynamicextensions.nutility.XmlUtil.writeCDataElement;
 import static edu.common.dynamicextensions.nutility.XmlUtil.writeElement;
@@ -484,6 +493,8 @@ public abstract class Control implements Comparable<Control>, Serializable {
 		ctrlProps.put("phi", isPhi());
 		ctrlProps.put("mandatory", isMandatory());
 		ctrlProps.put("showInGrid", showInGrid());
+		ctrlProps.put("rowColumn", getxPos());
+		ctrlProps.put("pageRow", getSequenceNumber());
 		
 		getProps(ctrlProps);
 		return ctrlProps;
@@ -505,6 +516,43 @@ public abstract class Control implements Comparable<Control>, Serializable {
 		writeElement(writer, "showInGrid",  showInGrid());
 		writeCDataElement(writer, "showWhen", getShowWhenExpr());
 		writeElement(writer, "hidden", isHidden());
+	}
+
+	public Map<String, Object> diff(Control other) {
+		Map<String, Object> thisProps = getProps();
+		Map<String, Object> otherProps = other.getProps();
+
+		Map<String, Object> result = new HashMap<>();
+		for (Map.Entry<String, Object> thisKv : thisProps.entrySet()) {
+			Object thisValue = thisKv.getValue();
+			Object otherValue = otherProps.get(thisKv.getKey());
+			if (!objEq(thisValue, otherValue)) {
+				result.put(thisKv.getKey(), otherValue);
+			}
+		}
+
+		for (Map.Entry<String, Object> otherKv : otherProps.entrySet()) {
+			if (!thisProps.containsKey(otherKv.getKey())) {
+				result.put(otherKv.getKey(), otherKv.getValue());
+			}
+		}
+
+		if (!result.isEmpty()) {
+			result.put("name", getName());
+		}
+
+		return result;
+	}
+
+	protected boolean objEq(Object o1, Object o2) {
+		return (o1 == null && isEmptyStrOrColl(o2)) ||
+			(o2 == null && isEmptyStrOrColl(o1)) ||
+			Objects.equals(o1, o2);
+	}
+
+	private boolean isEmptyStrOrColl(Object o) {
+		return (o instanceof String && ((String) o).trim().isEmpty()) ||
+			(o instanceof Collection && ((Collection<?>) o).isEmpty());
 	}
 
 	private boolean isRuleEnabled(String ruleName) {

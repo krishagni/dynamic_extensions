@@ -121,6 +121,8 @@ public class Container implements Serializable {
 
 	private transient boolean disableDeletedCtrlsTracking = false;
 
+	private transient Map<String, Object> diff;
+
 	public void useAsDto() {
 		this.isDto = true;
 	}
@@ -513,7 +515,7 @@ public class Container implements Serializable {
 		}		
 	}
 		
-	public void addControl(Control control) {
+	public Map<String, Object> addControl(Control control) {
 		ensureUniqueNameAndUdn(control);
 		validateNameAndUdn(control);
 		
@@ -543,6 +545,7 @@ public class Container implements Serializable {
 		controlsMap.put(control.getName(), control);
 		userDefCtrlNames.add(control.getUserDefinedName());
 		control.setContainer(this);
+		return control.getProps();
 	}
 
 	private void ensureUniqueNameAndUdn(Control control) {
@@ -597,27 +600,34 @@ public class Container implements Serializable {
 		}
 	}
 
-	public void editControl(String name, Control control) {
+	public Map<String, Object> editControl(String name, Control control) {
 		throwExceptionIfDto();
-		editControl(name, control, false);
+		return editControl(name, control, false);
 	}
 	
-	public void editControl(String name, Control control, boolean bulkEdit) {
+	public Map<String, Object> editControl(String name, Control control, boolean bulkEdit) {
 		throwExceptionIfDto();
-		
+
+		Map<String, Object> diff = null;
 		Control existingControl = controlsMap.remove(name);
 		if (existingControl == null) {
 			// change this exception to status code
 			throw new FormException("Control with name doesn't exist: " + name);
 		}		
 		userDefCtrlNames.remove(existingControl.getUserDefinedName());
-
 		validateNameAndUdn(control);
-		existingControl.setHidden(control.isHidden());
 
-		if (control.getSequenceNumber() == 0) {
+		int inputSeqNo = control.getSequenceNumber();
+		if (inputSeqNo == 0) {
 			control.setSequenceNumber(existingControl.getSequenceNumber());
-		} else if (control.getSequenceNumber() > sequenceNo) {
+		}
+
+		if (!(bulkEdit && existingControl instanceof SubFormControl)) {
+			diff = existingControl.diff(control);
+		}
+
+		existingControl.setHidden(control.isHidden());
+		if (inputSeqNo > sequenceNo) {
 			sequenceNo = control.getSequenceNumber();
 		}
 		
@@ -710,7 +720,11 @@ public class Container implements Serializable {
 					} else {
 						existingSfContainer.setManagedTables(true); // perlocate down to all sub-forms
 					}
-					existingSfContainer.editContainer(newSfContainer);
+					diff = existingSfContainer.editContainer(newSfContainer);
+					if (!diff.isEmpty()) {
+						diff.put("name", newSfCtrl.getName());
+					}
+
 					existingSfCtrl.setCaption(newSfCtrl.getCaption());
 					existingSfCtrl.setUserDefinedName(newSfCtrl.getUserDefinedName());
 					existingSfCtrl.setSequenceNumber(newSfCtrl.getSequenceNumber());
@@ -729,6 +743,7 @@ public class Container implements Serializable {
 
 		controlsMap.put(control.getName(), control);
 		userDefCtrlNames.add(control.getUserDefinedName());
+		return diff;
 	}
 	
 	public void deleteControl(String name) {
@@ -766,7 +781,15 @@ public class Container implements Serializable {
 	public void disableDeletedCtrlsTracking(boolean input) {
 		this.disableDeletedCtrlsTracking = input;
 	}
-	
+
+	public Map<String, Object> getDiff() {
+		return diff;
+	}
+
+	public void setDiff(Map<String, Object> diff) {
+		this.diff = diff;
+	}
+
 	public Control getControl(String name) {
 		if (name.equals(primaryKeyCtrlName)) {
 			return getPrimaryKeyControl();
@@ -810,7 +833,7 @@ public class Container implements Serializable {
 		return save(userCtxt, jdbcDao);
 	}
 	
-	public Long save(UserContext userCtxt, JdbcDao jdbcDao) {		
+	public Long save(UserContext userCtxt, JdbcDao jdbcDao) {
 		throwExceptionIfDto();
 
 		ContainerDao dao = new ContainerDao(jdbcDao);
@@ -852,15 +875,15 @@ public class Container implements Serializable {
 				if (c.getId() == null) {
 					c.setId(ids.get(i++));
 				}
-			}		
+			}
 
 			setSkipControlFlags();
 			
 			if (insert) {
-				dao.insert(userCtxt, this);
+				dao.insert(userCtxt, this, getProps());
 				FormEventsNotifier.getInstance().notifyCreate(this);
 			} else {
-				dao.update(userCtxt, this);
+				dao.update(userCtxt, this, getDiff());
 				FormEventsNotifier.getInstance().notifyUpdate(this);
 			}
 
@@ -1020,8 +1043,9 @@ public class Container implements Serializable {
 		
 		Container container = null;
 		if (existingContainer != null) {
-			existingContainer.editContainer(parsedContainer);
+			Map<String, Object> diff = existingContainer.editContainer(parsedContainer);
 			container = existingContainer;
+			existingContainer.setDiff(diff);
 		} else if (parsedContainer.isDto) {
 			container = fromDto(parsedContainer);
 			container.setManagedTables(!createTables);
@@ -1032,7 +1056,7 @@ public class Container implements Serializable {
 		return container.save(ctxt);
 	}
 				
-	public void editContainer(Container newContainer) {
+	public Map<String, Object> editContainer(Container newContainer) {
 		if (!this.getName().equals(newContainer.getName())) {
 			throw new FormException("Error : Container name cannot be edited");
 		}
@@ -1040,10 +1064,15 @@ public class Container implements Serializable {
 		if (isManagedTables()) {
 			setDbTableName(newContainer.getDbTableName());
 		}
-		
+
+		Map<String, Object> diff = new HashMap<>();
+		if (!StringUtils.equals(getCaption(), newContainer.getCaption())) {
+			diff.put("caption", newContainer.getCaption());
+		}
+
 		setName(newContainer.getName());
 		setCaption(newContainer.getCaption());
-		
+
 		if (newContainer.getPrimaryKey() != null) {
 			this.setPrimaryKey(newContainer.getPrimaryKey());
 		}
@@ -1057,20 +1086,25 @@ public class Container implements Serializable {
 		if (disableDeletedCtrlsTracking) {
 			getDeletedCtrls().clear();
 		}
-		
+
+		List<Map<String, Object>> added = new ArrayList<>();
+		List<Map<String, Object>> edited = new ArrayList<>();
 		for (Control  ctrl : newContainer.getControls()) {
 			if (getControl(ctrl.getName()) == null) {
-				addControl(ctrl);
+				added.add(addControl(ctrl));
 			} else {
-				editControl(ctrl.getName(), ctrl, true);				
+				Map<String, Object> ctrlDiff = editControl(ctrl.getName(), ctrl, true);
+				if (!ctrlDiff.isEmpty()) {
+					edited.add(ctrlDiff);
+				}
 			}			
 		}
 		
-		deleteRemovedControls(newContainer);
-
-
+		List<String> deleted = deleteRemovedControls(newContainer);
+		List<String> restored = new ArrayList<>();
 		for (String undoUdn : newContainer.undoDeletesList) {
 			undoDelete(undoUdn);
+			restored.add(undoUdn);
 		}
 		
 		//
@@ -1090,9 +1124,27 @@ public class Container implements Serializable {
 		if (newContainer.getLayouts() != null) {
 			this.layouts.addAll(newContainer.getLayouts());
 		}
+
+		if (!added.isEmpty()) {
+			diff.put("added", added);
+		}
+
+		if (!edited.isEmpty()) {
+			diff.put("edited", edited);
+		}
+
+		if (!deleted.isEmpty()) {
+			diff.put("deleted", deleted);
+		}
+
+		if (!restored.isEmpty()) {
+			diff.put("restored", restored);
+		}
+
+		return diff;
 	}
 
-	protected void deleteRemovedControls(Container newContainer) {
+	protected List<String> deleteRemovedControls(Container newContainer) {
 		Collection<Control> existingCtrls = getControls();
 		Collection<Control> removedCtrls = new ArrayList<Control>();
 		for (Control ctrl : existingCtrls) {
@@ -1101,14 +1153,18 @@ public class Container implements Serializable {
 				removedCtrls.add(ctrl);
 			}			
 		}
-		
+
+		List<String> deleted = new ArrayList<>();
 		for (Control removedCtrl : removedCtrls) {
 			deleteControl(removedCtrl.getName());
+			deleted.add(removedCtrl.getName());
 		}
 
 		if (!disableDeletedCtrlsTracking) {
 			getDeletedCtrls().addAll(removedCtrls);
 		}
+
+		return deleted;
 	}
 
 	protected void undoDelete(String undoUdn) {
