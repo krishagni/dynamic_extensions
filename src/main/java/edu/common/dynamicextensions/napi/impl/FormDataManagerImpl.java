@@ -950,7 +950,7 @@ public class FormDataManagerImpl implements FormDataManager {
 			}
 
 			List<Long> recIds = getRecordIds(jdbcDao, ctrl, cv.getValue(), false);
-			if (CollectionUtils.isEmpty(recIds)) {
+			if (recIds == null || recIds.isEmpty()) {
 				//
 				// no records found with this value
 				//

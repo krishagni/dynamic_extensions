@@ -19,6 +19,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.apache.commons.lang3.StringUtils;
 import com.google.gson.Gson;
@@ -801,6 +802,8 @@ public class Container implements Serializable {
 	public Control getControlByUdn(String userDefName) {
 		if (userDefName.equals(primaryKeyCtrlName)) {
 			return getPrimaryKeyControl();
+		} else if (userDefName.equals("_rec_details_")) {
+			return getRecordStatusControl();
 		}
 
 		if (!userDefCtrlNames.contains(userDefName)) {
@@ -826,6 +829,49 @@ public class Container implements Serializable {
 		field.setDbColumnName(getPrimaryKey());
 		field.setCaption(getCaption() + " ID");
 		return field;
+	}
+
+	public SubFormControl getRecordStatusControl() {
+		Container recDetailsForm = new Container();
+		recDetailsForm.setCaption(getCaption() + " Activity");
+		recDetailsForm.setName("_rec_details_");
+		recDetailsForm.setDbTableName("CATISSUE_FORM_RECORD_ENTRY");
+		recDetailsForm.setManagedTables(true);
+
+		SubFormControl recDetails = new SubFormControl();
+		recDetails.setName("_rec_details_");
+		recDetails.setUserDefinedName("_rec_details_");
+		recDetails.setParentKey("IDENTIFIER");
+		recDetails.setForeignKey("RECORD_ID");
+		recDetails.setFormIdColumn("RECORD_ID"); // TODO
+		recDetails.setSubContainer(recDetailsForm);
+
+		PvVersion statusPvs = new PvVersion();
+		statusPvs.setPermissibleValues(
+			Stream.of("COMPLETE", "DRAFT")
+				.map(
+					status -> {
+						PermissibleValue pv = new PermissibleValue();
+						pv.setValue(status);
+						pv.setOptionName(status);
+						return pv;
+					}
+				).toList()
+			);
+
+		PvDataSource statusPvSrc = new PvDataSource();
+		statusPvSrc.setDataType(DataType.STRING);
+		statusPvSrc.getPvVersions().add(statusPvs);
+
+		RadioButton statusField = new RadioButton();
+		statusField.setName("status");
+		statusField.setUserDefinedName("status");
+		statusField.setCaption(getCaption() + " Status");
+		statusField.setDbColumnName("FORM_STATUS");
+		statusField.setPvDataSource(statusPvSrc);
+		recDetailsForm.addControl(statusField);
+
+		return recDetails;
 	}
 
 	public Long save(UserContext userCtxt) {
