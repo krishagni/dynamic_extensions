@@ -18,6 +18,8 @@ public class ResultColumn implements Serializable {
 	
 	private Object value;
 
+	private Boolean allUrls;
+
 	private transient boolean firstColumnOfShallowForm;
 	
 	public ResultColumn(ExpressionNode columnExpr, int instance) {
@@ -94,6 +96,14 @@ public class ResultColumn implements Serializable {
 		}
 
 		return url;
+	}
+
+	public Boolean allUrls() {
+		return allUrls;
+	}
+
+	public void allUrls(Boolean allUrls) {
+		this.allUrls = allUrls;
 	}
 	
 	public String[] getCaptions() {

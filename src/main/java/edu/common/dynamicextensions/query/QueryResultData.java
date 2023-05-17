@@ -14,15 +14,18 @@ import java.util.TimeZone;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.apache.commons.lang3.StringUtils;
+
 import edu.common.dynamicextensions.domain.nui.Control;
 import edu.common.dynamicextensions.domain.nui.DatePicker;
 import edu.common.dynamicextensions.napi.FormException;
 import edu.common.dynamicextensions.ndao.DbSettingsFactory;
 import edu.common.dynamicextensions.nutility.Util;
 import edu.common.dynamicextensions.query.ast.AggregateNode;
+import edu.common.dynamicextensions.query.ast.ConcatNode;
 import edu.common.dynamicextensions.query.ast.ExpressionNode;
 import edu.common.dynamicextensions.query.ast.FieldNode;
-import edu.common.dynamicextensions.query.cachestore.LinkedEhCacheMap;
+import edu.common.dynamicextensions.query.ast.LiteralValueNode;
 
 public class QueryResultData {
 	private static final String ISO_DATE_TIME_FMT = "yyyy-MM-dd'T'HH:mm:ss";
@@ -150,7 +153,17 @@ public class QueryResultData {
     }
 
 	public String[] getColumnUrls() {
-		return getResultColumns().stream().map(ResultColumn::getUrl).toArray(String[]::new);
+		return getResultColumns().stream().map(
+			rc -> {
+				if (StringUtils.isNotBlank(rc.getUrl())) {
+					return rc.getUrl();
+				} else if (Boolean.TRUE.equals(rc.allUrls())) {
+					return "url_value";
+				}
+
+				return null;
+			}
+		).toArray(String[]::new);
 	}
 
 	public String[] getColumnTypes() {
@@ -231,12 +244,35 @@ public class QueryResultData {
 						cumulative.put(i, existing);
 					}
                 }
-                
+
                 if (screener != null) {
                 	row = screener.getScreenedRowData(resultColumns, row);
                 }
 
-                this.rows.add(row);
+	            int idx = -1;
+	            for (ResultColumn resultColumn : resultColumns) {
+		            ++idx;
+		            if (Boolean.FALSE.equals(resultColumn.allUrls())) {
+			            continue;
+		            }
+
+		            if (resultColumn.getExpression() instanceof ConcatNode || resultColumn.getExpression() instanceof LiteralValueNode) {
+			            if (row[idx] instanceof String) {
+				            String value = row[idx].toString();
+				            resultColumn.allUrls(
+					            value.indexOf("https://") == 0 ||
+						        value.indexOf("http://") == 0 ||
+						        value.indexOf("mailto://") == 0
+				            );
+			            } else if (row[idx] != null) {
+				            resultColumn.allUrls(false);
+			            }
+		            } else {
+			            resultColumn.allUrls(false);
+		            }
+	            }
+
+	            this.rows.add(row);
             }    		
     	} catch (Exception e) {
     		if (rows != null) {
@@ -381,6 +417,29 @@ public class QueryResultData {
 				Object[] row = iter.next();
 				if (screener != null) {
 					row = screener.getScreenedRowData(resultColumns, row);
+				}
+
+				int idx = -1;
+				for (ResultColumn resultColumn : resultColumns) {
+					++idx;
+					if (Boolean.FALSE.equals(resultColumn.allUrls())) {
+						continue;
+					}
+
+					if (resultColumn.getExpression() instanceof ConcatNode || resultColumn.getExpression() instanceof LiteralValueNode) {
+						if (row[idx] instanceof String) {
+							String value = row[idx].toString();
+							resultColumn.allUrls(
+								value.indexOf("https://") == 0 ||
+								value.indexOf("http://") == 0 ||
+								value.indexOf("mailto://") == 0
+							);
+						} else if (row[idx] != null) {
+							resultColumn.allUrls(false);
+						}
+					} else {
+						resultColumn.allUrls(false);
+					}
 				}
 				
 				return row;
