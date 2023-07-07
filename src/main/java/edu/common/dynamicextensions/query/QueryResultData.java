@@ -250,7 +250,7 @@ public class QueryResultData {
                 }
 
 	            int idx = -1;
-	            for (ResultColumn resultColumn : resultColumns) {
+	            for (ResultColumn resultColumn : screener.getScreenedResultColumns(resultColumns)) {
 		            ++idx;
 		            if (Boolean.FALSE.equals(resultColumn.allUrls())) {
 			            continue;
@@ -420,7 +420,7 @@ public class QueryResultData {
 				}
 
 				int idx = -1;
-				for (ResultColumn resultColumn : resultColumns) {
+				for (ResultColumn resultColumn : screener.getScreenedResultColumns(resultColumns)) {
 					++idx;
 					if (Boolean.FALSE.equals(resultColumn.allUrls())) {
 						continue;
