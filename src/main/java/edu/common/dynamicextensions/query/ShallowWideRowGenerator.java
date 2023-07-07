@@ -2,7 +2,6 @@ package edu.common.dynamicextensions.query;
 
 import java.sql.ResultSet;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -339,7 +338,6 @@ public class ShallowWideRowGenerator {
         for (ExpressionNode exprNode : queryExpr.getSelectList().getElements()) {
             String[] aliasPk = WideRowUtil.getTabAliasPk(queryJoinTree, exprNode);
             String tabAlias = aliasPk == null ? "literal" : aliasPk[0];
-
             List<ExpressionNode> fields = tabFieldsMap.get(tabAlias);
             if (fields == null) {
                 fields = new ArrayList<ExpressionNode>();

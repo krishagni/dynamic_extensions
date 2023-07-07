@@ -1,9 +1,5 @@
 package edu.common.dynamicextensions.query;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
 import edu.common.dynamicextensions.napi.FormException;
 import edu.common.dynamicextensions.query.ast.AggregateNode;
 import edu.common.dynamicextensions.query.ast.ArithExpressionNode;
@@ -44,15 +40,26 @@ public class WideRowUtil {
 			return getTabAliasPk(rootNode, aggNode.getField());
 		} else if (exprNode instanceof ConcatNode) {
 			ConcatNode concatNode = (ConcatNode) exprNode;
-			List<String> aliases = new ArrayList<>();
+
+			String[] retTabAliasPk = null;
+			JoinTree retTabNode = null;
 			for (ExpressionNode arg : concatNode.getArgs()) {
 				String[] tabAliasPk = getTabAliasPk(rootNode, arg);
 				if (tabAliasPk != null) {
-					aliases.addAll(Arrays.asList(tabAliasPk));
+					JoinTree tabNode = rootNode.getNode(tabAliasPk[0]);
+					if (retTabAliasPk == null) {
+						retTabAliasPk = tabAliasPk;
+						retTabNode = tabNode;
+					} else if (!retTabAliasPk[0].equals(tabAliasPk[0])) {
+						if (retTabNode.isAncestorOf(tabNode) || retTabNode.getFormName().equals("CollectionProtocol")) {
+							retTabNode = tabNode;
+							retTabAliasPk = tabAliasPk;
+						}
+					}
 				}
 			}
 
-			return aliases.toArray(new String[0]);
+			return retTabAliasPk;
     	} else if (exprNode instanceof ArithExpressionNode) {
     		ArithExpressionNode arithExprNode = (ArithExpressionNode)exprNode;
     		return getTabAliasPk(rootNode, arithExprNode.getLeftOperand(), arithExprNode.getRightOperand());    		
