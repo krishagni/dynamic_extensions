@@ -250,7 +250,8 @@ public class QueryResultData {
                 }
 
 	            int idx = -1;
-	            for (ResultColumn resultColumn : screener.getScreenedResultColumns(resultColumns)) {
+				List<ResultColumn> columns = screener != null ? screener.getScreenedResultColumns(resultColumns) : resultColumns;
+	            for (ResultColumn resultColumn : columns) {
 		            ++idx;
 		            if (Boolean.FALSE.equals(resultColumn.allUrls())) {
 			            continue;
@@ -420,7 +421,8 @@ public class QueryResultData {
 				}
 
 				int idx = -1;
-				for (ResultColumn resultColumn : screener.getScreenedResultColumns(resultColumns)) {
+				List<ResultColumn> columns = screener != null ? screener.getScreenedResultColumns(resultColumns) : resultColumns;
+				for (ResultColumn resultColumn : columns) {
 					++idx;
 					if (Boolean.FALSE.equals(resultColumn.allUrls())) {
 						continue;
