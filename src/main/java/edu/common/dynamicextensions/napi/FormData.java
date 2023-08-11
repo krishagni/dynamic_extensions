@@ -10,7 +10,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
-
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
@@ -232,6 +231,10 @@ public class FormData {
 	}
 						
 	public Map<String, Object> getFieldNameValueMap(boolean includeUdn) {
+		return getFieldNameValueMap(includeUdn, false);
+	}
+
+	public Map<String, Object> getFieldNameValueMap(boolean includeUdn, boolean includeUiValue) {
 		Map<String, Object> props = new HashMap<>();
 		props.put("appData", getAppData());
 		props.put("containerId", container.getId());
@@ -244,24 +247,31 @@ public class FormData {
 			}
 			
 			Object value = fieldValue.getValue();			
-			if (value instanceof FileControlValue) {
-				FileControlValue fcv = (FileControlValue)value;
+			if (value instanceof FileControlValue fcv) {
 				props.put(name, fcv.toValueMap());
 			} else if (value instanceof List) {
 				List<FormData> formDataList = (List<FormData>)value;
 				
 				List<Map<String, Object>> sfData = new ArrayList<>();
 				for (FormData formData : formDataList) {
-					sfData.add(formData.getFieldNameValueMap(includeUdn));
+					sfData.add(formData.getFieldNameValueMap(includeUdn, includeUiValue));
 				}
 				
 				props.put(name, sfData);
 			} else if (value instanceof FormData) {
-				props.put(name, ((FormData) value).getFieldNameValueMap(includeUdn));
+				props.put(name, ((FormData) value).getFieldNameValueMap(includeUdn, includeUiValue));
 			} else if (value != null && value.getClass().isArray()) {
-				props.put(name, value);
+				if (includeUiValue && fieldValue.getUiValue() != null && fieldValue.getUiValue().getClass().isArray()) {
+					props.put(name, fieldValue.getUiValue());
+				} else {
+					props.put(name, value);
+				}
 			} else {
-				props.put(name, fieldValue.getControl().toString(value));
+				if (includeUiValue && fieldValue.getUiValue() != null) {
+					props.put(name, fieldValue.getUiValue());
+				} else {
+					props.put(name, fieldValue.getControl().toString(value));
+				}
 			}			
 		}
 		
@@ -297,8 +307,7 @@ public class FormData {
 			}
 
 			Object value = fieldValue.getValue();
-			if (value instanceof FileControlValue) {
-				FileControlValue fcv = (FileControlValue)value;
+			if (value instanceof FileControlValue fcv) {
 				value = fcv.toValueMap();
 			} else if (value instanceof List) {
 				List<FormData> formDataList = (List<FormData>)value;
@@ -309,8 +318,8 @@ public class FormData {
 				}
 
 				value = sfData;
-			} else if (value instanceof FormData) {
-				value = ((FormData)value).getFieldValueMap();
+			} else if (value instanceof FormData fd) {
+				value = fd.getFieldValueMap();
 			}
 
 			if (value != null) {
