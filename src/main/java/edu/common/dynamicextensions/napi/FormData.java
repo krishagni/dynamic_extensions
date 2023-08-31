@@ -200,13 +200,26 @@ public class FormData {
 					FormData subFormData = getFormData(sfCtrl.getSubContainer(), subValueMap, useUdn, formData);
 					formData.addFieldValue(new ControlValue(ctrl, subFormData));					
 				} else {
-					List<Map<String, Object>> subValueMapList = (List<Map<String, Object>>)fieldValue.getValue();
-					List<FormData> subFormData = new ArrayList<FormData>();
+					List<?> subValueMapList = (List<Map<String, Object>>)fieldValue.getValue();
+					List<FormData> subFormData = new ArrayList<>();
 					if (subValueMapList != null) {
-						for (Map<String, Object> subValueMap : subValueMapList) {
-							subFormData.add(getFormData(sfCtrl.getSubContainer(), subValueMap, useUdn, formData));
+						for (Object element : subValueMapList) {
+							Map<String, Object> subValueMap = null;
+							if (element instanceof List<?>) {
+								subValueMap = new HashMap<>();
+								for (Object field : ((List) element)) {
+									Map<String, Object> fieldMap = (Map<String, Object>) field;
+									subValueMap.put((String) (useUdn ? fieldMap.get("udn") : fieldMap.get("name")), fieldMap.get("value"));
+								}
+							} else if (element instanceof Map<?,?>) {
+								subValueMap = (Map<String, Object>) element;
+							}
+
+							if (subValueMap != null) {
+								subFormData.add(getFormData(sfCtrl.getSubContainer(), subValueMap, useUdn, formData));
+							}
 						}
-					} 
+					}
 					
 					formData.addFieldValue(new ControlValue(ctrl, subFormData));					
 				}
