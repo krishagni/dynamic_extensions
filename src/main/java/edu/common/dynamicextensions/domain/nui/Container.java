@@ -495,11 +495,26 @@ public class Container implements Serializable {
 	}	
 	
 	public List<Control> getAllControls() {
-		List<Control> controls = new ArrayList<Control>();
-		getAllControls(this, controls);
-		return controls;
+		return getAllControls(false);
 	}
-		
+
+	public List<Control> getAllControls(boolean includeSfCtrl) {
+		List<Control> result = new ArrayList<>();
+		for (Control ctrl : getOrderedControlList()) {
+			if (ctrl instanceof SubFormControl) {
+				if (includeSfCtrl) {
+					result.add(ctrl);
+				}
+
+				result.addAll(((SubFormControl) ctrl).getSubContainer().getAllControls());
+			} else {
+				result.add(ctrl);
+			}
+		}
+
+		return result;
+	}
+
 	//
 	// Behavioral API
 	//
@@ -1099,12 +1114,20 @@ public class Container implements Serializable {
 			container = parsedContainer;
 		}
 
+		if (!container.isManagedTables()) {
+			for (Control ctrl : container.getAllControls(true)) {
+				if ("id".equals(ctrl.getName()) || "id".equals(ctrl.getUserDefinedName())) {
+					throw new FormException("Error: Reserved name 'id' cannot be used as field variable name or udn");
+				}
+			}
+		}
+
 		return container.save(ctxt);
 	}
 				
 	public Map<String, Object> editContainer(Container newContainer) {
 		if (!this.getName().equals(newContainer.getName())) {
-			throw new FormException("Error : Container name cannot be edited");
+			throw new FormException("Error: Container name cannot be edited");
 		}
 		
 		if (isManagedTables()) {
@@ -1585,17 +1608,6 @@ public class Container implements Serializable {
 	// TODO: Hard coded tab name
 	private Long getUniqueId() {
 		return IdGenerator.getInstance().getNextId("DE_E_TNAMES");
-	}
-	
-	private void getAllControls(Container container, List<Control> controls) {	
-		for (Control control : container.getOrderedControlList()) {
-			if (control instanceof SubFormControl) {
-				SubFormControl sfCtrl = (SubFormControl)control;
-				getAllControls(sfCtrl.getSubContainer(), controls);
-			} else {
-				controls.add(control);
-			}
-		}
 	}
 
 	public static void main(String[] args) {
