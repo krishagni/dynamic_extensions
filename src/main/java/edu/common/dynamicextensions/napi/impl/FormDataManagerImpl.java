@@ -14,12 +14,12 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.dao.DataAccessException;
-import org.springframework.util.CollectionUtils;
 
 import edu.common.dynamicextensions.domain.nui.Container;
 import edu.common.dynamicextensions.domain.nui.Control;
@@ -883,12 +883,17 @@ public class FormDataManagerImpl implements FormDataManager {
 				}
 
 				ctrlValue = new ControlValue(ctrl, ctrl.toString(rsObj));
-				if (ctrl instanceof LookupControl) {
+				if (ctrl instanceof LookupControl luCtrl) {
+					Properties luProps = luCtrl.getPvSourceProps();
+
 					String tabAlias = "lut" + ++tabCnt;
 					Object uiValue = rs.getString(tabAlias + "v");
 					ctrlValue.setUiValue(uiValue);
+					if (luProps.getProperty("useDisplayValue", "false").equals("true")) {
+						ctrlValue.setValue(uiValue);
+					}
 
-					if (((LookupControl) ctrl).getCodeColumn() != null) {
+					if (luCtrl.getCodeColumn() != null) {
 						ctrlValue.setCodedValue(rs.getString(tabAlias + "cc"));
 					}
 				}
