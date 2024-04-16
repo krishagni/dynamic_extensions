@@ -22,6 +22,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import com.google.gson.Gson;
 import com.thoughtworks.xstream.XStream;
 import com.thoughtworks.xstream.XStreamException;
@@ -907,10 +908,10 @@ public class Container implements Serializable {
 			}
 
 			executeDDLWithoutTxn(jdbcDao);
-			
+
 			int numIds = 0;
 			List<Container> subContainers = getAllSubContainers();
-			
+
 			if (id == null) {
 				numIds = 1 + subContainers.size();
 			} else {
@@ -921,17 +922,17 @@ public class Container implements Serializable {
 				}
 			}
 
-			List<Long> ids = null;			
+			List<Long> ids = null;
 			if (numIds > 0) {
 				ids = dao.getContainerIds(numIds);
 			}
-			
-			
+
+
 			int i = 0;
 			if (id == null) {
 				id = ids.get(i++);
 			}
-			
+
 			for (Container c : subContainers) {
 				if (c.getId() == null) {
 					c.setId(ids.get(i++));
@@ -939,7 +940,7 @@ public class Container implements Serializable {
 			}
 
 			setSkipControlFlags();
-			
+
 			if (insert) {
 				dao.insert(userCtxt, this, getProps());
 				FormEventsNotifier.getInstance().notifyCreate(this);
@@ -948,9 +949,14 @@ public class Container implements Serializable {
 				FormEventsNotifier.getInstance().notifyUpdate(this);
 			}
 
-			return id;			
+			return id;
 		} catch (Exception e) {
-			throw new FormException("Error saving container", e);
+			String rootCauseMsg = ExceptionUtils.getRootCauseMessage(e);
+			if (StringUtils.contains(rootCauseMsg, "Row size too large")) {
+				throw new FormException("Error saving form. The form " + getName() + " has too many fields. The form has exceeded the database (MySQL) limit. Refer to the Wiki article (https://openspecimen.atlassian.net/l/cp/hofJn3eZ) for more details and possible resolutions.", e);
+			}
+
+			throw new FormException("Error saving form: " + getName(), e);
 		} finally {
 			ContainerCache.getInstance().remove(id);
 		}
