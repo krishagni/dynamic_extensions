@@ -1,15 +1,12 @@
 
 package edu.common.dynamicextensions.domain.nui;
 
-import static edu.common.dynamicextensions.nutility.XmlUtil.writeElement;
-import static edu.common.dynamicextensions.nutility.XmlUtil.writeElementEnd;
-import static edu.common.dynamicextensions.nutility.XmlUtil.writeElementStart;
-
 import java.io.Serializable;
 import java.io.Writer;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
+import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
@@ -17,11 +14,16 @@ import java.util.Map;
 import java.util.Properties;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.time.DateUtils;
 
 import edu.common.dynamicextensions.napi.FormException;
 import edu.common.dynamicextensions.ndao.ColumnTypeHelper;
 import edu.common.dynamicextensions.nutility.DeConfiguration;
 import edu.common.dynamicextensions.nutility.Util;
+
+import static edu.common.dynamicextensions.nutility.XmlUtil.writeElement;
+import static edu.common.dynamicextensions.nutility.XmlUtil.writeElementEnd;
+import static edu.common.dynamicextensions.nutility.XmlUtil.writeElementStart;
 
 public class DatePicker extends Control implements Serializable {
 	private static final long serialVersionUID = 6046956576964435896L;
@@ -97,6 +99,9 @@ public class DatePicker extends Control implements Serializable {
 	public Date fromString(String value) {
 		if (value == null || value.trim().isEmpty()) {
 			return null;
+		} else if ("current_time".equals(value)) {
+			Date currentTime = Calendar.getInstance().getTime();
+			return isDateTimeFmt() ? currentTime : DateUtils.truncate(currentTime, Calendar.DATE);
 		}
 
 		String fmt = DeConfiguration.getInstance().dateFormat();

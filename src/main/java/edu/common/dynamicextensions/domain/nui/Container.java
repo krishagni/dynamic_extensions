@@ -1187,8 +1187,12 @@ public class Container implements Serializable {
 		// Check whether this is correct way to handle?
 		// Probably check for skip rules referring to non-existing fields
 		//
-		this.skipRules.clear();
-		this.skipRules.addAll(newContainer.getSkipRules());
+		if (this.skipRules == null) {
+			this.skipRules = new ArrayList<>(newContainer.getSkipRules());
+		} else {
+			this.skipRules.clear();
+			this.skipRules.addAll(newContainer.getSkipRules());
+		}
 
 		if (this.layouts != null) {
 			this.layouts.clear();
