@@ -202,6 +202,8 @@ public class Query {
 
 		JdbcDao jdbcDao = JdbcDaoFactory.getJdbcDao();
 		jdbcDao.setQueryTimeout(timeoutInSeconds);
+		jdbcDao.setFetchSize(Integer.MIN_VALUE);
+
         return jdbcDao.getResultSet(dataSql, null, new ResultExtractor<QueryResponse>() {
         	@Override
         	public QueryResponse extract(ResultSet rs)
