@@ -27,6 +27,13 @@ public class JdbcDao {
 	public void setQueryTimeout(int queryTimeout) {
 		jdbcTemplate.setQueryTimeout(queryTimeout);
 	}
+
+	public void setFetchSize(int fetchSize) {
+		if (DbSettingsFactory.isMySQL()) {
+//			System.out.println("Setting the result set fetch size: " + fetchSize);
+			jdbcTemplate.setFetchSize(fetchSize);
+		}
+	}
 	
 	public <T> T getResultSet(final String query, final List<?> params, final ResultExtractor<T> extractor) {
 		Object[] paramArray = params != null ? params.toArray() : new Object[0];
