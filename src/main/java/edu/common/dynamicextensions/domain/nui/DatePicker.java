@@ -99,7 +99,7 @@ public class DatePicker extends Control implements Serializable {
 	public Date fromString(String value) {
 		if (value == null || value.trim().isEmpty()) {
 			return null;
-		} else if ("current_time".equals(value)) {
+		} else if ("current_time".equals(value) || "current_date".equals(value)) {
 			Date currentTime = Calendar.getInstance().getTime();
 			return isDateTimeFmt() ? currentTime : DateUtils.truncate(currentTime, Calendar.DATE);
 		}
