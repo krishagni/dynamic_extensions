@@ -173,6 +173,9 @@ public class QueryGenerator {
 
 		if (StringUtils.isNotBlank(groupBy)) {
 			sql += " group by " + groupBy;
+			if (StringUtils.isBlank(orderBy)) {
+				orderBy = groupBy;
+			}
 		}
 
 		if (StringUtils.isNotBlank(havingClause)) {
@@ -198,7 +201,7 @@ public class QueryGenerator {
             result = dataSql;          
         } else {
         	String orderedQuery = dataSql;
-        	if (!isWideRowSupport(queryExpr) && queryExpr.getOrderExpr() == null) {
+        	if (!isWideRowSupport(queryExpr) && queryExpr.getOrderExpr() == null && !queryExpr.isAggregateQuery()) {
         		orderedQuery += " order by " + joinTree.getAlias() + "." + joinTree.getForm().getPrimaryKey();
         	}
         	
