@@ -1,6 +1,7 @@
 package edu.common.dynamicextensions.napi.impl;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -15,10 +16,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.tika.config.TikaConfig;
+import org.apache.tika.io.TikaInputStream;
+import org.apache.tika.metadata.Metadata;
+import org.apache.tika.mime.MediaType;
 import org.springframework.dao.DataAccessException;
 
 import edu.common.dynamicextensions.domain.nui.Container;
@@ -69,9 +74,12 @@ public class FormDataManagerImpl implements FormDataManager {
 
 	private static final String GET_FILE = "SELECT FORM_ID, RECORD_ID, FILE_ID, FILE_TYPE, FILENAME FROM DYEXTN_FORM_FILES WHERE FILE_ID = ?";
 
+	private static volatile TikaConfig tikaConfig;
+
 	private boolean auditEnable = true;
 
 	private String activeRecordsJoinSql;
+
 	
 	public FormDataManagerImpl(boolean auditEnable) {
 		this.auditEnable = auditEnable;
@@ -617,11 +625,13 @@ public class FormDataManagerImpl implements FormDataManager {
 
 				if (ctrl instanceof FileUploadControl) {
 					FileControlValue fcv = ctrlValue != null ? (FileControlValue) ctrlValue.getValue() : null;
-					if (fcv == null) {
+					if (fcv == null || StringUtils.isBlank(fcv.getFileId())) {
 						params.add(null);
 						params.add(null);
 						params.add(null);
 					} else {
+						fcv.setContentType(getContentType(fcv.getFileId()));
+
 						params.add(fcv.getFilename());
 						params.add(fcv.getContentType());
 						params.add(fcv.getFileId());
@@ -634,11 +644,9 @@ public class FormDataManagerImpl implements FormDataManager {
 					params.add(value);
 					if (ctrl instanceof SignatureControl && value != null) {
 						String fileId = value.toString();
-						String fileType = fileId.substring(fileId.lastIndexOf(".") + 1);
-
 						FileControlValue fcv = new FileControlValue();
 						fcv.setFilename(fileId);
-						fcv.setContentType("image/" + fileType);
+						fcv.setContentType(getContentType(fileId));
 						fcv.setFileId(fileId);
 						files.add(fcv);
 					}
@@ -1127,6 +1135,36 @@ public class FormDataManagerImpl implements FormDataManager {
 			params.add(file.getContentType());
 			params.add(file.getFilename());
 			jdbcDao.executeUpdate(INSERT_FILE_ID, params);
+		}
+	}
+
+	private String getContentType(String fileId) {
+		FileInputStream fin = null;
+		try {
+			if (tikaConfig == null) {
+				synchronized (FormDataManagerImpl.class) {
+					if (tikaConfig == null) {
+						tikaConfig = new TikaConfig();
+					}
+				}
+			}
+
+			fin = new FileInputStream(filePath(fileId));
+			Metadata metadata = new Metadata();
+			MediaType mediaType = tikaConfig.getDetector().detect(TikaInputStream.get(fin), metadata);
+			if (mediaType == null) {
+				throw new FormException("Unable to detect the content type of the file: " + fileId);
+			}
+
+			return mediaType.toString();
+		} catch (Throwable e) {
+			if (e instanceof FormException fe) {
+				throw fe;
+			}
+
+			throw new FormException("Error detecting the content type of the file: " + fileId, e);
+		} finally {
+			IOUtils.closeQuietly(fin);
 		}
 	}
 }
