@@ -1,7 +1,6 @@
 package edu.common.dynamicextensions.napi.impl;
 
 import java.io.File;
-import java.io.InputStream;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -16,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -47,7 +47,6 @@ import edu.common.dynamicextensions.ndao.JdbcDao;
 import edu.common.dynamicextensions.ndao.JdbcDaoFactory;
 import edu.common.dynamicextensions.ndao.ResultExtractor;
 import edu.common.dynamicextensions.nutility.DeConfiguration;
-import edu.common.dynamicextensions.nutility.IoUtil;
 
 public class FormDataManagerImpl implements FormDataManager {
 	private static final String GET_MULTI_SELECT_VALUES_SQL = "SELECT RECORD_ID, %s FROM %s WHERE %s";
@@ -63,6 +62,12 @@ public class FormDataManagerImpl implements FormDataManager {
 	private static final String GET_FILE_CONTROL_VALUES = "SELECT %s, %s, %s from %s where IDENTIFIER = ?";
 
 	private static final String GET_BY_FILE_ID = "SELECT %s, %s from %s where %s = ?";
+
+	private static final String DELETE_FILE_IDS = "DELETE FROM DYEXTN_FORM_FILES WHERE FORM_ID = ? AND RECORD_ID = ?";
+
+	private static final String INSERT_FILE_ID = "INSERT INTO DYEXTN_FORM_FILES (FORM_ID, RECORD_ID, FILE_ID, FILE_TYPE, FILENAME) VALUES (?, ?, ?, ?, ?)";
+
+	private static final String GET_FILE = "SELECT FORM_ID, RECORD_ID, FILE_ID, FILE_TYPE, FILENAME FROM DYEXTN_FORM_FILES WHERE FILE_ID = ?";
 
 	private boolean auditEnable = true;
 
@@ -212,9 +217,15 @@ public class FormDataManagerImpl implements FormDataManager {
 			FormAuditManager auditManager = new FormAuditManagerImpl();
 			List<ControlValue> dirtyFields = auditManager.getDirtyFields(prevData, formData);
 			if (!dirtyFields.isEmpty()) {
-				Long recordId = saveOrUpdateFormData(jdbcDao, formData, null);
+				List<FileControlValue> files = new ArrayList<>();
+				Long recordId = saveOrUpdateFormData(jdbcDao, formData, null, files);
 				formData.setRecordId(recordId);
 				formData.incrementRevision();
+
+				deleteFiles(jdbcDao, formData.getContainer().getId(), formData.getRecordId());
+				if (!files.isEmpty()) {
+					insertFiles(jdbcDao, formData.getContainer().getId(), formData.getRecordId(), files);
+				}
 
 				if (auditEnable) {
 					String op = formData.getRecordId() == null ? "INSERT" : "UPDATE";
@@ -339,6 +350,26 @@ public class FormDataManagerImpl implements FormDataManager {
 		}
 
 		return null;
+	}
+
+	@Override
+	public FileControlValue getFileMetadata(String fileId) {
+		return JdbcDaoFactory.getJdbcDao().getResultSet(GET_FILE, Collections.singletonList(fileId),
+			rs -> {
+				if (!rs.next()) {
+					return null;
+				}
+
+				FileControlValue result = new FileControlValue();
+				result.setFormId(rs.getLong(1));
+				result.setRecordId(rs.getLong(2));
+				result.setFileId(rs.getString(3));
+				result.setContentType(rs.getString(4));
+				result.setFileName(rs.getString(5));
+				result.setPath(filePath(result.getFileId()));
+				return result;
+			}
+		);
 	}
 
 	private FormData getFormData(final JdbcDao jdbcDao, final Container container, String identifyingColumn, Long recordId)
@@ -566,7 +597,7 @@ public class FormDataManagerImpl implements FormDataManager {
 		return "(" + inClause.toString() + ")";
 	}
 	
-	private Long saveOrUpdateFormData(JdbcDao jdbcDao, FormData formData, Long parentRecId)
+	private Long saveOrUpdateFormData(JdbcDao jdbcDao, FormData formData, Long parentRecId, List<FileControlValue> files)
 	throws Exception {
 		List<Control> simpleCtrls = new ArrayList<>();
 		List<Control> multiSelectCtrls = new ArrayList<>();
@@ -574,7 +605,6 @@ public class FormDataManagerImpl implements FormDataManager {
 
 		Container container = formData.getContainer();
 		Long recordId = formData.getRecordId();
-		List<InputStream> inputStreams = new ArrayList<>();
 		
 		segregateControls(container, simpleCtrls, multiSelectCtrls, subFormCtrls);
 		
@@ -595,12 +625,23 @@ public class FormDataManagerImpl implements FormDataManager {
 						params.add(fcv.getFilename());
 						params.add(fcv.getContentType());
 						params.add(fcv.getFileId());
+						files.add(fcv);
 					}
 				} else if (ctrlValue == null || ctrlValue.getValue() == null || ctrlValue.getValue().toString().trim().isEmpty()) {
 					params.add(null);
 				} else {
 					Object value = ctrl.fromString(ctrlValue.getValue().toString());
 					params.add(value);
+					if (ctrl instanceof SignatureControl && value != null) {
+						String fileId = value.toString();
+						String fileType = fileId.substring(fileId.lastIndexOf(".") + 1);
+
+						FileControlValue fcv = new FileControlValue();
+						fcv.setFilename(fileId);
+						fcv.setContentType("image/" + fileType);
+						fcv.setFileId(fileId);
+						files.add(fcv);
+					}
 				}
 			}
 
@@ -675,7 +716,7 @@ public class FormDataManagerImpl implements FormDataManager {
 				String sfTableName = subFormCtrl.getSubContainer().getDbTableName();
 				Set<Long> currentSfIds = new HashSet<>();
 				for (FormData subFormData : subFormsData) {
-					Long subFormRecId = saveOrUpdateFormData(jdbcDao, subFormData, recordId);
+					Long subFormRecId = saveOrUpdateFormData(jdbcDao, subFormData, recordId, files);
 					subFormData.setRecordId(subFormRecId);
 					currentSfIds.add(subFormRecId);
 				}
@@ -694,7 +735,6 @@ public class FormDataManagerImpl implements FormDataManager {
 				}
 			}
 		} finally {
-			inputStreams.forEach(IoUtil::close);
 		}
 		
 		return recordId;		
@@ -1064,6 +1104,29 @@ public class FormDataManagerImpl implements FormDataManager {
 			return jdbcDao.getResultSet(sql.toString(), Collections.singletonList(recordId), ResultSet::next);
 		} catch (Exception e) {
 			return false;
+		}
+	}
+
+	private void deleteFiles(JdbcDao jdbcDao, Long formId, Long recordId) {
+		List<Object> params = new ArrayList<>();
+		params.add(formId);
+		params.add(recordId);
+		jdbcDao.executeUpdate(DELETE_FILE_IDS, params);
+	}
+
+	private void insertFiles(JdbcDao jdbcDao, Long formId, Long recordId, List<FileControlValue> files) {
+		if (files == null || files.isEmpty()) {
+			return;
+		}
+
+		for (FileControlValue file : files) {
+			List<Object> params = new ArrayList<>();
+			params.add(formId);
+			params.add(recordId);
+			params.add(file.getFileId());
+			params.add(file.getContentType());
+			params.add(file.getFilename());
+			jdbcDao.executeUpdate(INSERT_FILE_ID, params);
 		}
 	}
 }

@@ -5,6 +5,10 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class FileControlValue {
+	private Long formId;
+
+	private Long recordId;
+
 	private String filename;
 
 	private String contentType;
@@ -21,6 +25,26 @@ public class FileControlValue {
 		this.filename = filename;
 		this.contentType = contentType;
 		this.fileId = fileId;
+	}
+
+	public Long getFormId() {
+		return formId;
+	}
+
+	public void setFormId(Long formId) {
+		this.formId = formId;
+	}
+
+	public Long getRecordId() {
+		return recordId;
+	}
+
+	public void setRecordId(Long recordId) {
+		this.recordId = recordId;
+	}
+
+	public void setFilename(String filename) {
+		this.filename = filename;
 	}
 
 	public String getFilename() {

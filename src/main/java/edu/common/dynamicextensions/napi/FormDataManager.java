@@ -33,7 +33,9 @@ public interface FormDataManager {
 	FileControlValue getFileControlValue(Long formId, Long recordId, String ctrlName);
 
 	FileControlValue getFileControlValue(Long formId, String ctrlName, String fileId);
-	
+
+	FileControlValue getFileMetadata(String fileId);
+
 	FormDataFilterManager getFilterMgr();
 
 	List<Long> getRecordIds(Container container, String ctrlName, Object value, boolean useUdn);
