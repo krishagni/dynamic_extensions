@@ -31,4 +31,16 @@
       <column name="FILE_ID" />
     </createIndex>
   </changeSet>
+
+  <changeSet author="vpawar" id="Change the file ID width to 128 chars">
+    <modifyDataType tableName="DYEXTN_FORM_FILES" columnName="FILE_ID" newDataType="${string.type}(128)" />
+  </changeSet>
+
+  <changeSet author="vpawar" id="Change the file type width to 128 chars">
+    <modifyDataType tableName="DYEXTN_FORM_FILES" columnName="FILE_TYPE" newDataType="${string.type}(128)" />
+  </changeSet>
+
+  <changeSet author="vpawar" id="Change the file name width to 256 chars">
+    <modifyDataType tableName="DYEXTN_FORM_FILES" columnName="FILENAME" newDataType="${string.type}(256)" />
+  </changeSet>
 </databaseChangeLog>
