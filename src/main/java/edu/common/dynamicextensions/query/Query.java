@@ -133,7 +133,9 @@ public class Query {
         if (queryExpr.hasResultPostProc()) {
         	String procName = queryExpr.getResultPostProcName();
         	ResultPostProcFactory factory = ResultPostProcManager.getInstance().getFactory(procName);
-        	resultPostProc = factory.create(queryExpr, timeZone);
+			if (factory != null) {
+				resultPostProc = factory.create(queryExpr, timeZone);
+			}
         }        
     }
 
