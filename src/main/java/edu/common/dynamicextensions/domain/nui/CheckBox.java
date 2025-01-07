@@ -1,8 +1,6 @@
 
 package edu.common.dynamicextensions.domain.nui;
 
-import static edu.common.dynamicextensions.nutility.XmlUtil.*;
-
 import java.io.Serializable;
 import java.io.Writer;
 import java.math.BigDecimal;
@@ -12,6 +10,10 @@ import java.util.Map;
 import java.util.Properties;
 
 import edu.common.dynamicextensions.ndao.ColumnTypeHelper;
+
+import static edu.common.dynamicextensions.nutility.XmlUtil.writeElement;
+import static edu.common.dynamicextensions.nutility.XmlUtil.writeElementEnd;
+import static edu.common.dynamicextensions.nutility.XmlUtil.writeElementStart;
 
 public class CheckBox extends Control implements Serializable {
 	private static final long serialVersionUID = -2448001564822140677L;
@@ -44,16 +46,16 @@ public class CheckBox extends Control implements Serializable {
 	}
 	
 	@Override
-	public String toString(Object value) { 
+	public String toString(Object value) {
 		if (value instanceof BigDecimal) {
 			int val = ((BigDecimal) value).intValue();
 			return val == 0 ? "0" : "1";
-		} else if (value == null) {
-			return "0";
-		} else {
-			String valStr = value.toString();
+		} else if (value != null) {
+			String valStr = value.toString().toLowerCase().trim();
 			return valStr.equals("true") || valStr.equals("1") ? "1" : "0";
 		}
+
+		return null;
 	}
 	
 	@Override
