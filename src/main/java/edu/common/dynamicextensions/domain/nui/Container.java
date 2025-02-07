@@ -1177,9 +1177,11 @@ public class Container implements Serializable {
 		
 		List<String> deleted = deleteRemovedControls(newContainer);
 		List<String> restored = new ArrayList<>();
-		for (String undoUdn : newContainer.undoDeletesList) {
-			undoDelete(undoUdn);
-			restored.add(undoUdn);
+		if (newContainer.undoDeletesList != null) {
+			for (String undoUdn : newContainer.undoDeletesList) {
+				undoDelete(undoUdn);
+				restored.add(undoUdn);
+			}
 		}
 		
 		//

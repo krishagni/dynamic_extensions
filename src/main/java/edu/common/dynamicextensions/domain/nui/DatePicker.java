@@ -16,9 +16,12 @@ import java.util.Properties;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.DateUtils;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import edu.common.dynamicextensions.napi.FormException;
 import edu.common.dynamicextensions.ndao.ColumnTypeHelper;
 import edu.common.dynamicextensions.nutility.DeConfiguration;
+import edu.common.dynamicextensions.nutility.LogUtil;
 import edu.common.dynamicextensions.nutility.Util;
 
 import static edu.common.dynamicextensions.nutility.XmlUtil.writeElement;
@@ -26,6 +29,8 @@ import static edu.common.dynamicextensions.nutility.XmlUtil.writeElementEnd;
 import static edu.common.dynamicextensions.nutility.XmlUtil.writeElementStart;
 
 public class DatePicker extends Control implements Serializable {
+	private static final LogUtil logger = LogUtil.getLogger(DatePicker.class);
+
 	private static final long serialVersionUID = 6046956576964435896L;
 
 	private static final SimpleDateFormat YYYY_MM_DD = new SimpleDateFormat("yyyy-MM-dd");
@@ -259,6 +264,12 @@ public class DatePicker extends Control implements Serializable {
 			fromString(value.toString());
 			return ValidationStatus.OK;
 		} catch (Exception e) {
+			logger.error("Invalid value: " + value + ". Error: " + e.getMessage(), e);
+			try {
+				logger.error("Input Value = " + new ObjectMapper().writeValueAsString(value));
+			} catch (Throwable t) {
+			}
+
 			return ValidationStatus.INVALID_VALUE;
 		}
 	}
