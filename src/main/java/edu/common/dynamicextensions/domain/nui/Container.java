@@ -1012,7 +1012,7 @@ public class Container implements Serializable {
 			throw new FormException("Error obtaining container: " + id, e);
 		} finally {
 			if (container != null) {
-				logger.info("Time taken to load the form " + container.getName() + " is: " + (Calendar.getInstance().getTimeInMillis() - t1) + " ms");
+				logger.debug("Time taken to load the form " + container.getName() + " is: " + (Calendar.getInstance().getTimeInMillis() - t1) + " ms");
 			}
 		}
 	}
@@ -1041,7 +1041,7 @@ public class Container implements Serializable {
 		} catch (Exception e) {
 			throw new FormException("Error obtaining container: " + name, e);
 		} finally {
-			logger.info("Time taken to load the form " + name + " is: " + (Calendar.getInstance().getTimeInMillis() - t1) + " ms");
+			logger.debug("Time taken to load the form " + name + " is: " + (Calendar.getInstance().getTimeInMillis() - t1) + " ms");
 		}
 	}
 		
