@@ -851,7 +851,7 @@ public class Container implements Serializable {
 		Container recDetailsForm = new Container();
 		recDetailsForm.setCaption(getCaption() + " Activity");
 		recDetailsForm.setName("_rec_details_");
-		recDetailsForm.setDbTableName("CATISSUE_FORM_RECORD_ENTRY");
+		recDetailsForm.setDbTableName("OS_FORM_RECORD_STATUSES");
 		recDetailsForm.setManagedTables(true);
 
 		SubFormControl recDetails = new SubFormControl();

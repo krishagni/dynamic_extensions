@@ -345,6 +345,10 @@ public class QueryGenerator {
             from.append(" on ").append(joinTree.getAlias()).append(".").append(joinTree.getForeignKey())
                 .append(" = ").append(parentTree.getAlias()).append(".").append(joinTree.getParentKey());
 
+			if (joinTree.getTab() != null && joinTree.getTab().equalsIgnoreCase("OS_FORM_RECORD_STATUSES")) {
+				from.append(" and ").append(joinTree.getAlias()).append(".FORM_ID = ").append(parentTree.getForm().getId());
+			}
+
 			addActiveJoinCond(joinTree, from);
 			addAutoJoinCond(joinTree, from);
         } else if (joinTree.isExtensionForm() && parentTree != null) {
