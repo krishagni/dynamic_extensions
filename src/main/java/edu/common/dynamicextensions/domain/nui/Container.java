@@ -313,15 +313,11 @@ public class Container implements Serializable {
 	}
 	
 	public boolean hasPhiFields() {
-		boolean hasPhiFields = false;
-		for (Control control : getAllControls()) {
-			if (control.isPhi()) {
-				hasPhiFields = true;
-				break;
-			}
-		}
+		return getAllControls().stream().anyMatch(Control::isPhi);
+	}
 
-		return hasPhiFields;
+	public boolean hasFileFields() {
+		return getAllControls().stream().anyMatch(Control::isFileField);
 	}
 
 	public String getUdnFormula(String shortCodeFormula) {

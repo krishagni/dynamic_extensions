@@ -60,6 +60,11 @@ public class FileUploadControl extends Control implements Serializable {
 	}
 
 	@Override
+	public boolean isFileField() {
+		return true;
+	}
+
+	@Override
 	public void serializeToXml(Writer writer, Properties props) {
 		writeElementStart(writer, "fileUpload");			
 		super.serializeToXml(writer, props);			

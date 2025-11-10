@@ -230,9 +230,11 @@ public class FormDataManagerImpl implements FormDataManager {
 				formData.setRecordId(recordId);
 				formData.incrementRevision();
 
-				deleteFiles(jdbcDao, formData.getContainer().getId(), formData.getRecordId());
-				if (!files.isEmpty()) {
-					insertFiles(jdbcDao, formData.getContainer().getId(), formData.getRecordId(), files);
+				if (formData.getContainer().hasFileFields()) {
+					deleteFiles(jdbcDao, formData.getContainer().getId(), formData.getRecordId());
+					if (!files.isEmpty()) {
+						insertFiles(jdbcDao, formData.getContainer().getId(), formData.getRecordId(), files);
+					}
 				}
 
 				if (auditEnable) {

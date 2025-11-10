@@ -351,6 +351,10 @@ public abstract class Control implements Comparable<Control>, Serializable {
 
 	public abstract <T> T fromString(String value);
 
+	public boolean isFileField() {
+		return false;
+	}
+
 	public String toDisplayValue(Object value) {
 		return toString(value);
 	}

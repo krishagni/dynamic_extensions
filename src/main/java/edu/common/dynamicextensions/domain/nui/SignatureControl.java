@@ -42,6 +42,11 @@ public class SignatureControl extends Control implements Serializable {
 	}
 
 	@Override
+	public boolean isFileField() {
+		return true;
+	}
+
+	@Override
 	public void serializeToXml(Writer writer, Properties props) {
 		writeElementStart(writer, "signature");
 		super.serializeToXml(writer, props);
