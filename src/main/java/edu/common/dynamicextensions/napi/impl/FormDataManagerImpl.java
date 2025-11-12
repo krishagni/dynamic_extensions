@@ -926,8 +926,12 @@ public class FormDataManagerImpl implements FormDataManager {
 				}
 			} else {
 				Object rsObj = null;
-				if (ctrl instanceof DatePicker) {
-					rsObj = rs.getTimestamp(ctrl.getDbColumnName());
+				if (ctrl instanceof DatePicker dateCtrl) {
+					if (dateCtrl.isDateTimeFmt()) {
+						rsObj = rs.getTimestamp(ctrl.getDbColumnName());
+					} else {
+						rsObj = rs.getDate(dateCtrl.getDbColumnName());
+					}
 				} else {
 					rsObj = rs.getObject(ctrl.getDbColumnName());
 				}

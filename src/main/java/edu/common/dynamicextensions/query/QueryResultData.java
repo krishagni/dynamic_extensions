@@ -486,12 +486,13 @@ public class QueryResultData {
 		boolean strictlyDate = false;
 		if (col != null && col.getExpression() instanceof FieldNode) {
 			Control ctrl = ((FieldNode) col.getExpression()).getCtrl();
-			if (ctrl instanceof DatePicker) {
-				DatePicker dp = (DatePicker) ctrl;
+			if (ctrl instanceof DatePicker dp) {
 				if (dp.getFormat() != null) {
 					dateTime = dp.getFormat().contains("HH:mm");
 					strictlyDate = !dateTime && dp.getFormat().endsWith("/dateOnly");
 				}
+
+				strictlyDate = strictlyDate || (!dp.isDateTimeFmt() && dp.getDbColumnName().startsWith("DE_A_"));
 			}
 		}
 

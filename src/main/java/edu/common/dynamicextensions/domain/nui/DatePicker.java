@@ -5,6 +5,9 @@ import java.io.Serializable;
 import java.io.Writer;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.Calendar;
 import java.util.Collections;
@@ -14,8 +17,6 @@ import java.util.Map;
 import java.util.Properties;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.time.DateUtils;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import edu.common.dynamicextensions.napi.FormException;
@@ -101,12 +102,11 @@ public class DatePicker extends Control implements Serializable {
 	
 	@SuppressWarnings("unchecked")
 	@Override
-	public Date fromString(String value) {
+	public Object fromString(String value) {
 		if (value == null || value.trim().isEmpty()) {
 			return null;
 		} else if ("current_time".equals(value) || "current_date".equals(value)) {
-			Date currentTime = Calendar.getInstance().getTime();
-			return isDateTimeFmt() ? currentTime : DateUtils.truncate(currentTime, Calendar.DATE);
+			return isDateTimeFmt() ? Calendar.getInstance().getTime() : LocalDate.now();
 		}
 
 		String fmt = DeConfiguration.getInstance().dateFormat();
@@ -119,7 +119,8 @@ public class DatePicker extends Control implements Serializable {
 			if (StringUtils.isBlank(timeFormat)) {
 				timeFormat = DEFAULT_TIME_FORMAT;
 			}
-			fmt = fmt + " " + timeFormat;
+
+			fmt += " " + timeFormat;
 		}
 
 		value = value.trim();
@@ -129,7 +130,7 @@ public class DatePicker extends Control implements Serializable {
 			} catch (DateTimeParseException dtpe) {
 				throw new FormException("Error creating date object from [" + value + "]. Format: " + fmt, dtpe);
 			}
-		} else {
+		} else if (isDateTimeFmt()) {
 			try {
 				SimpleDateFormat simpleDateFormat = new SimpleDateFormat(fmt);
 				simpleDateFormat.setLenient(false);
@@ -145,6 +146,16 @@ public class DatePicker extends Control implements Serializable {
 					}
 				}
 			}
+		} else {
+			try {
+				return LocalDate.parse(value, DateTimeFormatter.ofPattern(fmt));
+			} catch (DateTimeParseException e) {
+				try {
+					return LocalDate.parse(value);
+				} catch (Exception e2) {
+					throw new FormException("Error creating LocalDate from [" + value + "]. Format: " + fmt, e);
+				}
+			}
 		}
 	}
 	
@@ -153,12 +164,12 @@ public class DatePicker extends Control implements Serializable {
 		if (value == null) {
 			return null;
 		} else if (value instanceof String) {
-			return (String)value;
+			return (String) value;
 		} else if (value instanceof Number) {
 			return value.toString();
 		}
-		
-		return "" + getDateObj(value).getTime();		
+
+		return getDateStr(value);
 	}
 	
 	@Override
@@ -235,12 +246,18 @@ public class DatePicker extends Control implements Serializable {
 		writeElementEnd(writer, "datePicker");		
 	}
 	
-	private Date getDateObj(Object value) {
+	private String getDateStr(Object value) {
 		try {
-			if (Util.isOraTimestamp(value)) { 
-				return Util.getDateFromOraTimestamp(value);
-			} else if (value instanceof Date){ 
-				return (Date)value;
+			if (Util.isOraTimestamp(value)) {
+				return isDateTimeFmt() ? "" + Util.getDateFromOraTimestamp(value).getTime() : Util.getLocalDateFromOraTimestamp(value).toString();
+			} else if (value instanceof Date date) {
+				if (isDateTimeFmt()) {
+					return "" + date.getTime();
+				} else if (date instanceof java.sql.Date sqlDate) {
+					return sqlDate.toLocalDate().toString();
+				} else {
+					return date.toInstant().atZone(ZoneId.systemDefault()).toLocalDate().toString();
+				}
 			} else {
 				throw new FormException("Unknown object type");
 			}
