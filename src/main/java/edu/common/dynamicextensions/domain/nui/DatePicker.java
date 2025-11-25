@@ -21,6 +21,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import edu.common.dynamicextensions.napi.FormException;
 import edu.common.dynamicextensions.ndao.ColumnTypeHelper;
+import edu.common.dynamicextensions.ndao.DbSettingsFactory;
 import edu.common.dynamicextensions.nutility.DeConfiguration;
 import edu.common.dynamicextensions.nutility.LogUtil;
 import edu.common.dynamicextensions.nutility.Util;
@@ -147,15 +148,19 @@ public class DatePicker extends Control implements Serializable {
 				}
 			}
 		} else {
+			LocalDate date = null;
+
 			try {
-				return LocalDate.parse(value, DateTimeFormatter.ofPattern(fmt));
+				date = LocalDate.parse(value, DateTimeFormatter.ofPattern(fmt));
 			} catch (DateTimeParseException e) {
 				try {
-					return LocalDate.parse(value);
+					date = LocalDate.parse(value);
 				} catch (Exception e2) {
 					throw new FormException("Error creating LocalDate from [" + value + "]. Format: " + fmt, e);
 				}
 			}
+
+			return DbSettingsFactory.isOracle() ? java.sql.Date.valueOf(date) : date;
 		}
 	}
 	

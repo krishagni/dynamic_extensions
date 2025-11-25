@@ -12,4 +12,11 @@
       <column name="RECORD_ID" />
     </createIndex>
   </changeSet>
+
+  <changeSet author="vpawar" id="Store the object type and ID for which the file is associated">
+    <addColumn tableName="DYEXTN_FORM_FILES">
+      <column name="OBJECT_TYPE" type="${text.type}(255)" />
+      <column name="OBJECT_ID" type="${int.type}" />
+    </addColumn>
+  </changeSet>
 </databaseChangeLog>

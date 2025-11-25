@@ -70,9 +70,9 @@ public class FormDataManagerImpl implements FormDataManager {
 
 	private static final String DELETE_FILE_IDS = "DELETE FROM DYEXTN_FORM_FILES WHERE FORM_ID = ? AND RECORD_ID = ?";
 
-	private static final String INSERT_FILE_ID = "INSERT INTO DYEXTN_FORM_FILES (FORM_ID, RECORD_ID, FILE_ID, FILE_TYPE, FILENAME) VALUES (?, ?, ?, ?, ?)";
+	private static final String INSERT_FILE_ID = "INSERT INTO DYEXTN_FORM_FILES (FORM_ID, RECORD_ID, FILE_ID, FILE_TYPE, FILENAME, OBJECT_TYPE, OBJECT_ID) VALUES (?, ?, ?, ?, ?, ?, ?)";
 
-	private static final String GET_FILE = "SELECT FORM_ID, RECORD_ID, FILE_ID, FILE_TYPE, FILENAME FROM DYEXTN_FORM_FILES WHERE FILE_ID = ?";
+	private static final String GET_FILE = "SELECT FORM_ID, RECORD_ID, FILE_ID, FILE_TYPE, FILENAME, OBJECT_TYPE, OBJECT_ID FROM DYEXTN_FORM_FILES WHERE FILE_ID = ?";
 
 	private static volatile TikaConfig tikaConfig;
 
@@ -233,7 +233,7 @@ public class FormDataManagerImpl implements FormDataManager {
 				if (formData.getContainer().hasFileFields()) {
 					deleteFiles(jdbcDao, formData.getContainer().getId(), formData.getRecordId());
 					if (!files.isEmpty()) {
-						insertFiles(jdbcDao, formData.getContainer().getId(), formData.getRecordId(), files);
+						insertFiles(jdbcDao, formData, files);
 					}
 				}
 
@@ -377,6 +377,8 @@ public class FormDataManagerImpl implements FormDataManager {
 				result.setContentType(rs.getString(4));
 				result.setFileName(rs.getString(5));
 				result.setPath(filePath(result.getFileId()));
+				result.setObjectType(rs.getString(6));
+				result.setObjectId(rs.getLong(7));
 				return result;
 			}
 		);
@@ -1128,18 +1130,26 @@ public class FormDataManagerImpl implements FormDataManager {
 		jdbcDao.executeUpdate(DELETE_FILE_IDS, params);
 	}
 
-	private void insertFiles(JdbcDao jdbcDao, Long formId, Long recordId, List<FileControlValue> files) {
+	private void insertFiles(JdbcDao jdbcDao, FormData formData, List<FileControlValue> files) {
 		if (files == null || files.isEmpty()) {
 			return;
 		}
 
+		Object objectType = null, objectId = null;
+		if (formData.getAppData() != null) {
+			objectType = formData.getAppData().get("objectType");
+			objectId = formData.getAppData().get("objectId");
+		}
+
 		for (FileControlValue file : files) {
 			List<Object> params = new ArrayList<>();
-			params.add(formId);
-			params.add(recordId);
+			params.add(formData.getContainer().getId());
+			params.add(formData.getRecordId());
 			params.add(file.getFileId());
 			params.add(file.getContentType());
 			params.add(file.getFilename());
+			params.add(objectType);
+			params.add(objectId);
 			jdbcDao.executeUpdate(INSERT_FILE_ID, params);
 		}
 	}

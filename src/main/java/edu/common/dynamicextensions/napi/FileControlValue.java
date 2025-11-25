@@ -17,6 +17,10 @@ public class FileControlValue {
 	
 	private String path;
 
+	private String objectType;
+
+	private Long objectId;
+
 	public FileControlValue() {
 		
 	}
@@ -77,6 +81,22 @@ public class FileControlValue {
 
 	public void setPath(String path) {
 		this.path = path;
+	}
+
+	public String getObjectType() {
+		return objectType;
+	}
+
+	public void setObjectType(String objectType) {
+		this.objectType = objectType;
+	}
+
+	public Long getObjectId() {
+		return objectId;
+	}
+
+	public void setObjectId(Long objectId) {
+		this.objectId = objectId;
 	}
 
 	public String toString() {
