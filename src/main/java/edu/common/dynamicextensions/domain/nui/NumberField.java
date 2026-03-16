@@ -169,7 +169,7 @@ public class NumberField extends TextField implements Serializable {
 		try {
 			return new BigDecimal(value.trim());
 		} catch (NumberFormatException nfe) {
-			throw new FormException("Invalid number: " + value);
+			throw new FormException("Form: " + getContainer().getName() + ", Field: " + getName() + ". Invalid number: " + value);
 		}
 	}
 

@@ -45,7 +45,7 @@ public class LinkControl extends Control {
 		try {
 			return new BigDecimal(value);
 		} catch (NumberFormatException nfe) {
-			throw new FormException("Invalid number: " + value);
+			throw new FormException("Form: " + getContainer().getName() + ", Field: " + getName() + ". Invalid number: " + value);
 		}
 	}
 

@@ -143,7 +143,7 @@ public class Container implements Serializable {
 
 	public void setName(String name) {
 		if (StringUtils.isNotBlank(name) && notAllowed.matcher(name).find()) {
-			throw new FormException("Special characters (including spaces) are not allowed in the form names!");
+			throw new FormException("Special characters (including spaces) are not allowed in the form names! Input name: " + name);
 		}
 		
 		this.name = name;
@@ -337,7 +337,7 @@ public class Container implements Serializable {
 			Control ctrl =  getControl(symbol, "\\.");
 			
 			if (ctrl == null) {
-				throw new FormException("Control with name doesn't exist: " + symbol);
+				throw new FormException("Field with the name " + symbol + " doesn't exist in the form " + getName());
 			}
 			
 			String userDefName = getControlCanonicalUdn(ctrl);
@@ -364,7 +364,7 @@ public class Container implements Serializable {
 			Control ctrl =  getControlByUdn(symbol, "\\.");
 			
 			if (ctrl == null) {
-				throw new FormException("Control with udn doesn't exist: " + symbol);
+				throw new FormException("Field with the udn " + symbol + " doesn't exist in the form " + getName());
 			}
 			String ctrlName = getControlCanonicalName(ctrl);
 			shortCodeFormula = shortCodeFormula.replaceAll(symbol, ctrlName);
@@ -563,52 +563,52 @@ public class Container implements Serializable {
 
 	private void ensureUniqueNameAndUdn(Control control) {
 		if (StringUtils.isBlank(control.getName())) {
-			throw new FormException("Control name cannot be null");
+			throw new FormException("Field name cannot be blank/empty");
 		}
 
 		if (controlsMap.containsKey(control.getName())) {
-			throw new FormException("Control with the same name '" + control.getName() + "' already exists");
+			throw new FormException("Form: " + getName() + ". Field with the same name '" + control.getName() + "' already exists");
 		}
 
 		if (StringUtils.isBlank(control.getUserDefinedName())) {
-			throw new FormException("Control user defined name cannot be null");
+			throw new FormException("Field UDN cannot be empty/blank");
 		}
 
 		if (userDefCtrlNames.contains(control.getUserDefinedName())) {
-			throw new FormException("Control with the same user defined name '" + control.getUserDefinedName() + "' already exists");
+			throw new FormException("Form: " + getName() + ". Field with the same user defined name '" + control.getUserDefinedName() + "' already exists");
 		}
 
 		for (Control deletedCtrl : getDeletedCtrls()) {
 			if (control.getName().equals(deletedCtrl.getName())) {
-				throw new FormException("Control with the same name '" + control.getName() + "' was already used");
+				throw new FormException("Form: " + getName() + ". Field with the same name '" + control.getName() + "' was already used");
 			}
 
 			if (control.getUserDefinedName().equals(deletedCtrl.getUserDefinedName())) {
-				throw new FormException("Control with the same user defined name '" + control.getUserDefinedName() + "' was already used");
+				throw new FormException("Form: " + getName() + ". Field with the same user defined name '" + control.getUserDefinedName() + "' was already used");
 			}
 		}
 	}
 
 	private void validateNameAndUdn(Control control) {
 		if (StringUtils.isBlank(control.getName())) {
-			throw new FormException("Control name cannot be empty");
+			throw new FormException("Field name cannot be empty");
 		} else if (Character.isDigit(control.getName().trim().charAt(0))) {
 			throw new FormException(
-				"Control names like " + control.getName() +
+				"Field names like " + control.getName() +
 				" starting with numeric characters are not allowed!");
 		} else if (notAllowed.matcher(control.getName()).find()) {
 			throw new FormException(
-				"Control name " + control.getName() + " contains special characters. " +
+				"Field name " + control.getName() + " contains special characters. " +
 				"Special characters including spaces are not allowed.");
 		} else if (StringUtils.isBlank(control.getUserDefinedName())) {
-			throw new FormException("Control UDN cannot be empty");
+			throw new FormException("Field UDN cannot be empty");
 		} else if (Character.isDigit(control.getUserDefinedName().trim().charAt(0))) {
 			throw new FormException(
-				"Control UDNs like " + control.getUserDefinedName() +
+				"Field UDNs like " + control.getUserDefinedName() +
 				" starting with numeric characters are not allowed!");
 		} else if (notAllowed.matcher(control.getUserDefinedName()).find()) {
 			throw new FormException(
-				"Control UDN " + control.getUserDefinedName() + " contains special characters. " +
+				"Field UDN " + control.getUserDefinedName() + " contains special characters. " +
 				"Special characters including spaces are not allowed.");
 		}
 	}
@@ -625,7 +625,7 @@ public class Container implements Serializable {
 		Control existingControl = controlsMap.remove(name);
 		if (existingControl == null) {
 			// change this exception to status code
-			throw new FormException("Control with name doesn't exist: " + name);
+			throw new FormException("Form: " + getName() + ". Field with the name doesn't exist: " + name);
 		}		
 		userDefCtrlNames.remove(existingControl.getUserDefinedName());
 		validateNameAndUdn(control);
@@ -690,8 +690,7 @@ public class Container implements Serializable {
 
 				add(editLog, control);
 			} else {
-				throw new FormException(
-					"Changing field type from " +
+				throw new FormException("Form: " + getName() + ". Changing field " + existingControl.getName() + " type from " +
 					existingControl.getCtrlType() + " to " + control.getCtrlType() +
 					" is not allowed");
 			}
@@ -699,8 +698,7 @@ public class Container implements Serializable {
 			//
 			// saved control is edited
 			//
-			if (existingControl instanceof MultiSelectControl) {
-				MultiSelectControl existingMsCtrl = (MultiSelectControl)existingControl;
+			if (existingControl instanceof MultiSelectControl existingMsCtrl) {
 				MultiSelectControl newMsCtrl = (MultiSelectControl)control;
 				if (!isManagedTables()) {
 					// 
@@ -708,8 +706,7 @@ public class Container implements Serializable {
 					//
 					newMsCtrl.setTableName(existingMsCtrl.getTableName());
 				}				
-			} else if (existingControl instanceof SubFormControl) {
-				SubFormControl existingSfCtrl = (SubFormControl)existingControl;
+			} else if (existingControl instanceof SubFormControl existingSfCtrl) {
 				SubFormControl newSfCtrl = (SubFormControl)control;
 				
 				existingSfCtrl.setForeignKey(newSfCtrl.getForeignKey());
@@ -765,7 +762,7 @@ public class Container implements Serializable {
 		Control existingControl = controlsMap.remove(name);
 		if (existingControl == null) {
 			// change this exception to status code
-			throw new FormException("Control with name doesn't exist: " + name);
+			throw new FormException("Form: " + getName() + ". Field with the name doesn't exist: " + name);
 		}
 		userDefCtrlNames.remove(existingControl.getUserDefinedName());
 		
@@ -1128,8 +1125,8 @@ public class Container implements Serializable {
 	}
 				
 	public Map<String, Object> editContainer(Container newContainer) {
-		if (!this.getName().equals(newContainer.getName())) {
-			throw new FormException("Error: Container name cannot be edited");
+		if (!getName().equals(newContainer.getName())) {
+			throw new FormException("Error: Container name " + getName() + " cannot be edited");
 		}
 		
 		if (isManagedTables()) {
@@ -1256,7 +1253,7 @@ public class Container implements Serializable {
 			}
 
 			if (idx < 0 || idx >= getDeletedCtrls().size()) {
-				throw new FormException("No control with UDN '" + parts[0] + "' is in deleted state.");
+				throw new FormException("Form: " + getName() + ". No field with UDN '" + parts[0] + "' is in deleted state.");
 			}
 
 
@@ -1272,14 +1269,14 @@ public class Container implements Serializable {
 		} else {
 			Control ctrl = getControlByUdn(parts[0]);
 			if (ctrl == null) {
-				throw new FormException("No control with UDN: '" + parts[0] + "' exists.");
+				throw new FormException("Form: " + getName() + ". No field with UDN: '" + parts[0] + "' exists.");
 			}
 
 			if (ctrl instanceof SubFormControl) {
 				Container subForm = ((SubFormControl) ctrl).getSubContainer();
 				subForm.undoDelete(parts[1]);
 			} else {
-				throw new FormException("Control with UDN '" + parts[0] + "' is not a subform.");
+				throw new FormException("Form: " + getName() + ". Field with UDN '" + parts[0] + "' is not a subform.");
 			}
 		}
 	}
@@ -1678,7 +1675,7 @@ public class Container implements Serializable {
 	//
 	public String getControlCanonicalName(Control ctrl) {
 		if (ctrl.getName() == null) {
-			throw new FormException("Control name is null. Invalid control state");
+			throw new FormException("Field name is null. Invalid field state");
 		}
 		
 		Control formCtrl = controlsMap.get(ctrl.getName());
@@ -1703,7 +1700,7 @@ public class Container implements Serializable {
 	
 	public String getControlCanonicalUdn(Control ctrl) {
 		if (ctrl.getUserDefinedName() == null) {
-			throw new FormException("User defined name of control is null. Invalid control state");
+			throw new FormException("User defined name of field is null. Invalid field state");
 		}
 		
 		Control formCtrl = controlsMap.get(ctrl.getName());
@@ -1735,22 +1732,21 @@ public class Container implements Serializable {
 		
 		String[] controlNameParts = controlName.split(separator);
 		if (controlNameParts.length == 1) { // no sub form control name
-			throw new FormException("Invalid control name: " + controlName);
+			throw new FormException("Form: " + getName() + ". Invalid field name: " + controlName);
 		}
 		
 		for (int i = 0; i < controlNameParts.length - 1; ++i) {
 			ctrl = container.getControl(controlNameParts[i]);
-			if (!(ctrl instanceof SubFormControl)) {
-				throw new FormException("Invalid control name: " + controlName);
+			if (!(ctrl instanceof SubFormControl sfCtrl)) {
+				throw new FormException("Form: " + getName() + ". Invalid field name: " + controlName);
 			}
-			
-			SubFormControl sfCtrl = (SubFormControl)ctrl;
-			container = sfCtrl.getSubContainer();			
+
+			container = sfCtrl.getSubContainer();
 		}
 		
 		ctrl = container.getControl(controlNameParts[controlNameParts.length - 1]);
 		if (ctrl == null) {
-			throw new FormException("Invalid control name: " + controlName);
+			throw new FormException("Form: " + getName() + ". Invalid field name: " + controlName);
 		}
 		
 		return ctrl;
@@ -1765,22 +1761,21 @@ public class Container implements Serializable {
 		
 		String[] udnParts = userDefinedName.split(separator);
 		if (udnParts.length == 1) { // no sub form control name
-			throw new FormException("Invalid user defined name: " + userDefinedName);
+			throw new FormException("Form: " + getName() + ". Invalid user defined name: " + userDefinedName);
 		}
 		
 		for (int i = 0; i < udnParts.length - 1; ++i) {
 			ctrl = container.getControlByUdn(udnParts[i]);
-			if (!(ctrl instanceof SubFormControl)) {
-				throw new FormException("Invalid user defined name: " + userDefinedName);
+			if (!(ctrl instanceof SubFormControl sfCtrl)) {
+				throw new FormException("Form: " + getName() + ". Invalid user defined name: " + userDefinedName);
 			}
-			
-			SubFormControl sfCtrl = (SubFormControl)ctrl;
-			container = sfCtrl.getSubContainer();			
+
+			container = sfCtrl.getSubContainer();
 		}
 		
 		ctrl = container.getControlByUdn(udnParts[udnParts.length - 1]);
 		if (ctrl == null) {
-			throw new FormException("Invalid user defined name: " + userDefinedName);
+			throw new FormException("Form: " + getName() + ". Invalid user defined name: " + userDefinedName);
 		}
 		
 		return ctrl;

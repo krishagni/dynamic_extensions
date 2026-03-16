@@ -129,7 +129,8 @@ public class DatePicker extends Control implements Serializable {
 			try {
 				return Date.from(Instant.parse(value));
 			} catch (DateTimeParseException dtpe) {
-				throw new FormException("Error creating date object from [" + value + "]. Format: " + fmt, dtpe);
+				String id = "Form: " + getContainer().getName() + ", Field: " + getName() + ". ";
+				throw new FormException(id + "Error creating date object from [" + value + "]. Format: " + fmt, dtpe);
 			}
 		} else if (isDateTimeFmt()) {
 			try {
@@ -143,7 +144,8 @@ public class DatePicker extends Control implements Serializable {
 					try {
 						return YYYY_MM_DD.parse(value);
 					} catch (Exception e2) {
-						throw new FormException("Error creating date object from [" + value + "]. Format: " + fmt, e);
+						String id = "Form: " + getContainer().getName() + ", Field: " + getName() + ". ";
+						throw new FormException(id + "Error creating date object from [" + value + "]. Format: " + fmt, e);
 					}
 				}
 			}
@@ -156,7 +158,8 @@ public class DatePicker extends Control implements Serializable {
 				try {
 					date = LocalDate.parse(value);
 				} catch (Exception e2) {
-					throw new FormException("Error creating LocalDate from [" + value + "]. Format: " + fmt, e);
+					String id = "Form: " + getContainer().getName() + ", Field: " + getName() + ". ";
+					throw new FormException(id + "Error creating LocalDate from [" + value + "]. Format: " + fmt, e);
 				}
 			}
 
@@ -264,10 +267,10 @@ public class DatePicker extends Control implements Serializable {
 					return date.toInstant().atZone(ZoneId.systemDefault()).toLocalDate().toString();
 				}
 			} else {
-				throw new FormException("Unknown object type");
+				throw new FormException("Form: " + getContainer().getName() + ", Field: " + getName() + ". Unknown object type: " + value.getClass().getName());
 			}
 		} catch (Exception e) {
-			throw new FormException("Error converting input object: " + value.getClass().getName() + " to java.util.Date", e);
+			throw new FormException("Form: " + getContainer().getName() + ", Field: " + getName() + ". Error converting input object: " + value.getClass().getName() + " to java.util.Date", e);
 		}
 	}
 

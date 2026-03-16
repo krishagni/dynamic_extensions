@@ -29,7 +29,7 @@ public abstract class AbstractControlFactory implements ControlFactory {
 		String userDefName = getTextValue(ctrlEle, "udn");
 	
 		if (name == null) {
-			throw new FormException("Control name can't be null. Type = " + ctrlEle.getNodeName());
+			throw new FormException("Field name can't be null. Type = " + ctrlEle.getNodeName());
 		}
 		
 		if (userDefName == null) {
@@ -97,7 +97,7 @@ public abstract class AbstractControlFactory implements ControlFactory {
 		String udn  = (String) props.get("udn");
 
 		if (name == null || name.trim().isEmpty()) {
-			throw new FormException("Control name can't be null or empty. Type = " + ctrl.getCtrlType());
+			throw new FormException("Field name can't be null or empty. Type = " + ctrl.getCtrlType());
 		}
 
 		if (udn == null || udn.trim().isEmpty()) {

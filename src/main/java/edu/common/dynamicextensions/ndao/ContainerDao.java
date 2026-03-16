@@ -166,14 +166,15 @@ public class ContainerDao {
 			}
 			
 			rowsDeleted = jdbcDao.executeUpdate(sql, params);
-			if (rowsDeleted != null && rowsDeleted > 0) {
+			if (rowsDeleted > 0) {
 				addContainerRev(2, c, userCtxt, deleteTime, null);
 			}
 		} catch (Exception e) {
-			throw new FormException("Error deleting form", e);
+			String key = c != null ? c.getId() + ": " + c.getName() : "Unknown (null)";
+			throw new FormException("Error deleting form: " + key, e);
 		}
 		
-		return rowsDeleted != null && rowsDeleted == 1;
+		return rowsDeleted == 1;
 	}
 	
 	public Container getById(Long id) throws SQLException {
