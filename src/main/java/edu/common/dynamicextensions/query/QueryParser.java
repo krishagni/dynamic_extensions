@@ -1,7 +1,7 @@
 package edu.common.dynamicextensions.query;
 
-import org.antlr.v4.runtime.ANTLRInputStream;
 import org.antlr.v4.runtime.BailErrorStrategy;
+import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.misc.ParseCancellationException;
 import org.antlr.v4.runtime.tree.ParseTree;
@@ -19,8 +19,7 @@ public class QueryParser {
 
     public QueryExpressionNode getQueryAst() {
     	try {
-            ANTLRInputStream input = new ANTLRInputStream(queryExpr);
-            AQLLexer lexer = new AQLLexer(input);
+            AQLLexer lexer = new AQLLexer(CharStreams.fromString(queryExpr));
             
             CommonTokenStream tokens = new CommonTokenStream(lexer);
             AQLParser parser = new AQLParser(tokens);
