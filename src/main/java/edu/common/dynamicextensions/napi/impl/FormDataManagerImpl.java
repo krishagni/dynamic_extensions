@@ -215,8 +215,9 @@ public class FormDataManagerImpl implements FormDataManager {
 		try {
 			ensureUniqueConstraints(jdbcDao, formData);
 			ensureLinkConstraints(jdbcDao, formData.getContainer(), formData);
+			boolean newRecord = formData.getRecordId() == null;
 			FormData prevData = null;
-			if (formData.getRecordId() != null) {
+			if (!newRecord) {
 				prevData = getFormData(formData.getContainer(), formData.getRecordId());
 			}
 
@@ -238,7 +239,7 @@ public class FormDataManagerImpl implements FormDataManager {
 				}
 
 				if (auditEnable) {
-					String op = formData.getRecordId() == null ? "INSERT" : "UPDATE";
+					String op = newRecord ? "INSERT" : "UPDATE";
 					auditManager.audit(userCtxt, formData.getContainer(), dirtyFields, op, formData.getRecordId());
 				}
 			}
