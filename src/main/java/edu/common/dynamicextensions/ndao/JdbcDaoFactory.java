@@ -12,4 +12,8 @@ public class JdbcDaoFactory {
 	public static JdbcDao getJdbcDao() {
 		return new JdbcDao(ds);
 	}
+
+	public static JdbcDao getJdbcDao(DataSource ds) {
+		return new JdbcDao(ds != null ? ds : JdbcDaoFactory.ds);
+	}
 }

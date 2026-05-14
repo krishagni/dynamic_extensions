@@ -7,6 +7,7 @@ import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -165,10 +166,10 @@ public class QueryGenerator {
 		String orderBy = null;
 		if (isWideRowSupport(queryExpr)) {
 			if (StringUtils.isBlank(groupBy)) {
-				orderBy = joinTree.getAlias() + "." + joinTree.getForm().getPrimaryKey();
+				orderBy = getWideRowRootOrderBy(queryExpr.getSelectList(), joinTree);
 			}
 		} else {
-			orderBy = buildOrderBy(queryExpr.getOrderExpr());
+			orderBy = buildOrderBy(queryExpr.getOrderExpr(), queryExpr);
 		}
 
 		if (StringUtils.isNotBlank(groupBy)) {
@@ -202,7 +203,12 @@ public class QueryGenerator {
         } else {
         	String orderedQuery = dataSql;
         	if (!isWideRowSupport(queryExpr) && queryExpr.getOrderExpr() == null && !queryExpr.isAggregateQuery()) {
-        		orderedQuery += " order by " + joinTree.getAlias() + "." + joinTree.getForm().getPrimaryKey();
+				String orderBy = getColumnAlias(queryExpr, joinTree.getAlias() + "." + joinTree.getForm().getPrimaryKey());
+				if (StringUtils.isBlank(orderBy)) {
+					orderBy = joinTree.getAlias() + "." + joinTree.getForm().getPrimaryKey();
+				}
+
+        		orderedQuery += " order by " + orderBy;
         	}
         	
         	result = addLimitClause(orderedQuery, start, numRows);
@@ -270,37 +276,49 @@ public class QueryGenerator {
     }
     
     private void addWideRowMarkerCols(StringBuilder select, SelectListNode selectList, JoinTree joinTree) {
-    	Set<String> wideRowMarkerColumns = new LinkedHashSet<String>();
-    	
-    	String alias = joinTree.getAlias();
-    	String pk = joinTree.getForm().getPrimaryKey();    	
-    	wideRowMarkerColumns.add(getWideRowMarkerColumn(alias, pk));
-    	
-    	for (ExpressionNode element : selectList.getElements()) {
-    		if (element instanceof FieldNode) {
-    			FieldNode field = (FieldNode)element;
-    			Control ctrl = field.getCtrl();
-    			if (ctrl instanceof MultiSelectControl || ctrl instanceof LookupControl) {
-    				continue;
-    			}
-    			
-    			alias = field.getTabAlias();
-    			pk = ctrl.getContainer().getPrimaryKey();
-    			wideRowMarkerColumns.add(getWideRowMarkerColumn(alias, pk));
-    		} else {
-    			String[] aliasPk = WideRowUtil.getTabAliasPk(joinTree, element);
-    			if (aliasPk != null) {
-    				wideRowMarkerColumns.add(getWideRowMarkerColumn(aliasPk[0], aliasPk[1]));
-    			}
-    		}
+		for (Map.Entry<String, String> columnAlias : getWideRowMarkerColumnAliases(selectList, joinTree).entrySet()) {
+    		select.append(columnAlias.getKey()).append(" as ").append(columnAlias.getValue()).append(", ");
     	}
-    	
-    	int colCnt = 0;
-    	for (String column : wideRowMarkerColumns) {
-    		select.append(column).append(" as mc").append(colCnt).append(", ");
-    		colCnt++;
-    	}    	
     }
+
+	private Map<String, String> getWideRowMarkerColumnAliases(SelectListNode selectList, JoinTree joinTree) {
+		Map<String, String> result = new LinkedHashMap<>();
+		int colCnt = 0;
+
+		result.put(getWideRowMarkerColumn(joinTree.getAlias(), joinTree.getForm().getPrimaryKey()), "mc" + colCnt++);
+		for (ExpressionNode element : selectList.getElements()) {
+			String markerColumn = null;
+			if (element instanceof FieldNode field) {
+				Control ctrl = field.getCtrl();
+				if (ctrl instanceof MultiSelectControl || ctrl instanceof LookupControl) {
+					continue;
+				}
+
+				markerColumn = getWideRowMarkerColumn(field.getTabAlias(), ctrl.getContainer().getPrimaryKey());
+			} else {
+				String[] aliasPk = WideRowUtil.getTabAliasPk(joinTree, element);
+				if (aliasPk != null) {
+					markerColumn = getWideRowMarkerColumn(aliasPk[0], aliasPk[1]);
+				}
+			}
+
+			if (markerColumn != null && !result.containsKey(markerColumn)) {
+				result.put(markerColumn, "mc" + colCnt++);
+			}
+		}
+
+		return result;
+	}
+
+	private String getWideRowRootOrderBy(SelectListNode selectList, JoinTree joinTree) {
+		String markerColumn = getWideRowMarkerColumn(joinTree.getAlias(), joinTree.getForm().getPrimaryKey());
+		String markerColumnAlias = getWideRowMarkerColumnAliases(selectList, joinTree).get(markerColumn);
+		if (StringUtils.isNotBlank(markerColumnAlias)) {
+			return markerColumnAlias;
+		}
+
+		return joinTree.getAlias() + "." + joinTree.getForm().getPrimaryKey();
+	}
     
     private String getWideRowMarkerColumn(String alias, String primaryKey) {
     	return "'" + alias + "', " + alias + "." + primaryKey;
@@ -500,14 +518,16 @@ public class QueryGenerator {
 		return clause.toString();
 	}
 
-	private String buildOrderBy(OrderExprListNode orderList) {
+	private String buildOrderBy(OrderExprListNode orderList, QueryExpressionNode queryExpr) {
 		StringBuilder orderBy = new StringBuilder();
 		if (orderList == null) {
 			return orderBy.toString();
 		}
 
 		for (OrderExprNode expr : orderList.getExprs()) {
-			orderBy.append(getExpressionNodeSql(expr.getExpr(), expr.getExpr().getType()))
+			String orderExprSql = getExpressionNodeSql(expr.getExpr(), expr.getExpr().getType());
+			String colAlias = getColumnAlias(queryExpr, orderExprSql);
+			orderBy.append(StringUtils.isNotBlank(colAlias) ? colAlias : orderExprSql)
 				.append(expr.isDescending() ? " desc " : " asc ")
 				.append(", ");
 		}
@@ -517,6 +537,20 @@ public class QueryGenerator {
 		}
 
 		return orderBy.toString();
+	}
+
+	private String getColumnAlias(QueryExpressionNode queryExpr, String exprSql) {
+		if (queryExpr == null || queryExpr.getSelectList() == null) {
+			return null;
+		}
+
+		for (ExpressionNode element : queryExpr.getSelectList().getElements()) {
+			if (StringUtils.equalsIgnoreCase(exprSql, getExpressionNodeSql(element, element.getType()))) {
+				return element.getColumnAlias();
+			}
+		}
+
+		return null;
 	}
 
     private String buildGroupBy(QueryExpressionNode queryExpr) {

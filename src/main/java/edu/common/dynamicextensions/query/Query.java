@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import javax.sql.DataSource;
 
 import edu.common.dynamicextensions.ndao.JdbcDao;
 import edu.common.dynamicextensions.ndao.JdbcDaoFactory;
@@ -49,6 +50,8 @@ public class Query {
 	private QuerySpace qs;
 
 	private int timeoutInSeconds = -1;
+
+	private DataSource dataSource;
         
     public static Query createQuery() {
         return new Query();
@@ -120,6 +123,11 @@ public class Query {
 		return this;
 	}
 
+	public Query dataSource(DataSource dataSource) {
+		this.dataSource = dataSource;
+		return this;
+	}
+
     public void compile(String rootFormName, String query) {
         compile(rootFormName, query, null);
     }
@@ -170,19 +178,18 @@ public class Query {
     }
 
     public long getCount() {
+		return getCount(dataSource);
+	}
+
+	public long getCount(DataSource dataSource) {
         QueryGenerator gen = new QueryGenerator(false, ic, dateFormat, timeFormat);
         gen.setAutoJoinParams(autoJoinParams);
         String countSql = gen.getCountSql(queryExpr, queryJoinTree);
 
         long t1 = System.currentTimeMillis();
-		JdbcDao jdbcDao = JdbcDaoFactory.getJdbcDao();
+		JdbcDao jdbcDao = JdbcDaoFactory.getJdbcDao(dataSource);
 		jdbcDao.setQueryTimeout(timeoutInSeconds);
-        long count = jdbcDao.getResultSet(countSql, null, new ResultExtractor<Long>() {
-        	@Override
-        	public Long extract(ResultSet rs) throws SQLException {
-        		return rs.next() ? rs.getLong(1) : -1L;
-        	}
-        });
+        long count = jdbcDao.getResultSet(countSql, null, rs -> rs.next() ? rs.getLong(1) : -1L);
         
         long t2 = System.currentTimeMillis();
         logger.debug("Count SQL: " + countSql + "; Query Exec Time: " + (t2 - t1));
@@ -193,7 +200,15 @@ public class Query {
         return getData(0, 0);
     }
 
+	public QueryResponse getData(DataSource dataSource) {
+		return getData(0, 0, dataSource);
+	}
+
     public QueryResponse getData(int start, int numRows) {
+		return getData(start, numRows, dataSource);
+	}
+
+	public QueryResponse getData(int start, int numRows, DataSource dataSource) {
     	final boolean wideRowSupport = 
     			(wideRowMode != WideRowMode.OFF) && 
     			!queryExpr.isAggregateQuery() &&
@@ -202,7 +217,7 @@ public class Query {
         final String dataSql = getDataSql(wideRowSupport, start, numRows);        
         final long t1 = System.currentTimeMillis();
 
-		JdbcDao jdbcDao = JdbcDaoFactory.getJdbcDao();
+		JdbcDao jdbcDao = JdbcDaoFactory.getJdbcDao(dataSource);
 		jdbcDao.setQueryTimeout(timeoutInSeconds);
 		jdbcDao.setFetchSize(Integer.MIN_VALUE);
 
