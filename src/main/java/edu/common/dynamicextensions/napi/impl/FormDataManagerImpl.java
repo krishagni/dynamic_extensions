@@ -857,6 +857,10 @@ public class FormDataManagerImpl implements FormDataManager {
 
 			List<Object> params = new ArrayList<>();
 			for (String strValue : new LinkedHashSet<>(Arrays.asList(strValues))) {
+				if (StringUtils.isBlank(strValue)) {
+					continue;
+				}
+
 				Object value = msCtrl.fromString(strValue);
 				
 				params.clear();

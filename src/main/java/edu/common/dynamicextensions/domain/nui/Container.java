@@ -65,6 +65,8 @@ public class Container implements Serializable {
 
 	private static final String CREATE_IDX_DDL = "create index %s_%sX on %s(%s)";
 
+	private static final String CREATE_MS_UNIQUE_IDX_DDL = "create unique index %s_UQ on %s(RECORD_ID, VALUE)";
+
 	private static final String ADD_FK = "alter table %s add constraint %s foreign key (%s) references %s(%s)";
 			
 	private Long id;
@@ -1330,8 +1332,8 @@ public class Container implements Serializable {
 				MultiSelectControl mCtrl = (MultiSelectControl)ctrl;
 				mCtrl.setTableName(getUniqueTableName());
 
-				List<String> indexCols = Collections.singletonList("RECORD_ID");
-				createTable(jdbcDao, mCtrl.getTableName(), ctrl.getColumnDefs(), indexCols, false);
+				createTable(jdbcDao, mCtrl.getTableName(), ctrl.getColumnDefs(), null, false);
+				createMultiSelectIndexes(jdbcDao, mCtrl.getTableName());
 			} else if (ctrl instanceof SubFormControl) {
 				SubFormControl sfCtrl = (SubFormControl)ctrl;
 				sfCtrl.getSubContainer().executeDDL(jdbcDao, dbTableName);
@@ -1387,6 +1389,10 @@ public class Container implements Serializable {
 		}
 
 		addFks(jdbcDao, tableName, columnDefs);
+	}
+
+	private void createMultiSelectIndexes(JdbcDao jdbcDao, String tableName) {
+		jdbcDao.executeDDL(String.format(CREATE_MS_UNIQUE_IDX_DDL, tableName, tableName));
 	}
 	
 	private void addTableColumns(JdbcDao jdbcDao, String tableName, List<ColumnDef> columnDefs) {

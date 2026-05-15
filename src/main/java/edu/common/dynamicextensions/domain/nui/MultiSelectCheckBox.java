@@ -54,7 +54,7 @@ public class MultiSelectCheckBox extends SelectControl implements MultiSelectCon
 	@Override
 	public List<ColumnDef> getColumnDefs() {
 		List<ColumnDef> columnDefs = new ArrayList<ColumnDef>();
-		columnDefs.add(ColumnDef.get(getDbColumnName(), getDbType()));
+		columnDefs.add(ColumnDef.get(getDbColumnName(), getDbType() + " NOT NULL"));
 		columnDefs.add(ColumnDef.get(foreignKeyColumn, ColumnTypeHelper.getIntegerColType()));
 
 		return columnDefs;
