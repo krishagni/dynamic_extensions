@@ -35,8 +35,12 @@ public class RowsList {
 			return;
 		}
 
-		rows.destroy();
-		rows = null;
-		logger.info("Destruct: Open rows list: " + openCount.decrementAndGet());
+		try {
+			rows.destroy();
+			rows = null;
+			logger.info("Destruct: Open rows list: " + openCount.decrementAndGet());
+		} catch (Exception e) {
+			logger.error("Error closing/destructing open rows list", e);
+		}
 	}
 }

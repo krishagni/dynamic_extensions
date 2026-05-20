@@ -130,39 +130,47 @@ public class Crosstab implements ResultPostProc {
 	@Override
 	public RowsList getRows() {
 		RowsList result = new RowsList();
-		
-		for (Row row : rows.values()) {
-			for (String measureCol : measureCols) {
-				if (row.calculatedRow && rollupExcludeCols.contains(measureCol)) {
-					continue;
-				}
+		boolean cleanupRequired = true;
 
-				List<Object> values = new ArrayList<Object>(row.getRowKeyValues());
-				BigDecimal sum = BigDecimal.ZERO;
-				
-				if (measureCols.size() > 1) {
-					values.add(measureCol);
-				}
-				
-				for (Object colKey : dynamicCols) {
-					Map<String, Object> measureMap = row.getColValue(colKey);
-					Object measure = measureMap.get(measureCol);
-					values.add(measure);
-					
-					if (numericMeasure && measure != null) {
-						sum = sum.add(getBigDecimal(measure));
+		try {
+			for (Row row : rows.values()) {
+				for (String measureCol : measureCols) {
+					if (row.calculatedRow && rollupExcludeCols.contains(measureCol)) {
+						continue;
 					}
+
+					List<Object> values = new ArrayList<Object>(row.getRowKeyValues());
+					BigDecimal sum = BigDecimal.ZERO;
+
+					if (measureCols.size() > 1) {
+						values.add(measureCol);
+					}
+
+					for (Object colKey : dynamicCols) {
+						Map<String, Object> measureMap = row.getColValue(colKey);
+						Object measure = measureMap.get(measureCol);
+						values.add(measure);
+
+						if (numericMeasure && measure != null) {
+							sum = sum.add(getBigDecimal(measure));
+						}
+					}
+
+					if (numericMeasure) {
+						values.add(rollupExcludeCols.contains(measureCol) ? null : sum);
+					}
+
+					result.add(values.toArray(new Object[0]));
 				}
-				
-				if (numericMeasure) {
-					values.add(rollupExcludeCols.contains(measureCol) ? null : sum);
-				} 
-				
-				result.add(values.toArray(new Object[0]));								
+			}
+
+			cleanupRequired = false;
+			return result;
+		} finally {
+			if (cleanupRequired) {
+				result.cleanup();
 			}
 		}
-		
-		return result;
 	}
 	
 	@Override

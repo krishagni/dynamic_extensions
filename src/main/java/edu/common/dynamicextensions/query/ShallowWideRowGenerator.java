@@ -12,13 +12,16 @@ import edu.common.dynamicextensions.domain.nui.LookupControl;
 import edu.common.dynamicextensions.domain.nui.MultiSelectControl;
 import edu.common.dynamicextensions.napi.FormException;
 import edu.common.dynamicextensions.ndao.DbSettingsFactory;
+import edu.common.dynamicextensions.nutility.LogUtil;
 import edu.common.dynamicextensions.query.ast.ExpressionNode;
 import edu.common.dynamicextensions.query.ast.FieldNode;
 import edu.common.dynamicextensions.query.ast.QueryExpressionNode;
 import edu.common.dynamicextensions.query.cachestore.LinkedEhCacheMap;
 
 public class ShallowWideRowGenerator {
-    private LinkedEhCacheMap<String, WideRowNode> wideRows = new LinkedEhCacheMap<String, WideRowNode>();
+	private static final LogUtil logger = LogUtil.getLogger(ShallowWideRowGenerator.class);
+
+    private LinkedEhCacheMap<String, WideRowNode> wideRows = new LinkedEhCacheMap<>();
     
     private Map<String, String[]> tabJoinPath = new HashMap<String, String[]>();
     
@@ -127,7 +130,11 @@ public class ShallowWideRowGenerator {
     }
     
     public void cleanup() {
-    	wideRows.destroy();
+		try {
+			wideRows.destroy();
+		} catch (Exception e) {
+			logger.error("Error destroying wide-rows cache", e);
+		}
     }
     
     public List<ResultColumn> getResultColumns() {
