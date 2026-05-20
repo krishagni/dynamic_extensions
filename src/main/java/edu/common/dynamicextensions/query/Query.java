@@ -221,38 +221,43 @@ public class Query {
 		jdbcDao.setQueryTimeout(timeoutInSeconds);
 		jdbcDao.setFetchSize(Integer.MIN_VALUE);
 
-        return jdbcDao.getResultSet(dataSql, null, new ResultExtractor<QueryResponse>() {
-        	@Override
-        	public QueryResponse extract(ResultSet rs)
-        	throws SQLException {
-        		long t2 = System.currentTimeMillis();
-        		QueryResultData resultData = null;
-        		if (wideRowSupport) {
-        			resultData = getWideRowData(rs);
-        		} else if (resultPostProc != null) {
-        			resultData = getProcessedData(rs);
-        		} else {
-        			resultData = getQueryResultData(rs);
-        		}
+        return jdbcDao.getResultSet(dataSql, null, rs -> {
+	        long t2 = System.currentTimeMillis();
+	        QueryResultData resultData = null;
+	        boolean cleanupResultData = true;
+
+			try {
+				if (wideRowSupport) {
+					resultData = getWideRowData(rs);
+				} else if (resultPostProc != null) {
+					resultData = getProcessedData(rs);
+				} else {
+					resultData = getQueryResultData(rs);
+				}
 
 				resultData.setOutputExpression(!(resultPostProc instanceof Crosstab) && outputExpression);
-        		long t3 = System.currentTimeMillis();        		
-        		logger.debug("Data SQL: " + dataSql + "; Query Exec Time: " + (t2 - t1) + "; Result Prep Time: " + (t3 - t2));
-        		
-        		QueryResponse resp = new QueryResponse();
-        		resp.setSql(dataSql);																																																																																										
-        		resp.setResultData(resultData);
-        		resp.setExecutionTime(t2 - t1);
-        		resp.setPostExecutionTime(t3 - t2);
-        		
-        		Calendar cal = Calendar.getInstance();
-        		cal.setTimeInMillis(t1);
-        		resp.setTimeOfExecution(cal.getTime());
-        		return resp;
-        	}
+				long t3 = System.currentTimeMillis();
+				logger.debug("Data SQL: " + dataSql + "; Query Exec Time: " + (t2 - t1) + "; Result Prep Time: " + (t3 - t2));
+
+				QueryResponse resp = new QueryResponse();
+				resp.setSql(dataSql);
+				resp.setResultData(resultData);
+				resp.setExecutionTime(t2 - t1);
+				resp.setPostExecutionTime(t3 - t2);
+
+				Calendar cal = Calendar.getInstance();
+				cal.setTimeInMillis(t1);
+				resp.setTimeOfExecution(cal.getTime());
+				cleanupResultData = false;
+				return resp;
+			} finally {
+				if (cleanupResultData && resultData != null) {
+					resultData.close();
+				}
+			}
         });
     }
-            
+
     public String getDataSql() {
         return getDataSql(false, 0, 0);
     }
@@ -265,26 +270,48 @@ public class Query {
 
     private QueryResultData getWideRowData(ResultSet rs) {
         ShallowWideRowGenerator wideRowGenerator = new ShallowWideRowGenerator(queryJoinTree, queryExpr, wideRowMode);
-        wideRowGenerator.start();
-        int dbRowsCount = wideRowGenerator.processResultSet(rs);
-        wideRowGenerator.end();
+	    boolean cleanupRowGenerator = true;
 
-		QueryResultData qrd = getQueryResultData(wideRowGenerator.getResultColumns());
-        qrd.dataSource(wideRowGenerator);
-        qrd.setDbRowsCount(dbRowsCount);
-        return qrd;
+		try {
+			wideRowGenerator.start();
+			int dbRowsCount = wideRowGenerator.processResultSet(rs);
+			wideRowGenerator.end();
+
+			QueryResultData qrd = getQueryResultData(wideRowGenerator.getResultColumns());
+			qrd.setDbRowsCount(dbRowsCount);
+			qrd.dataSource(wideRowGenerator);
+			cleanupRowGenerator = false;
+			return qrd;
+		} finally {
+			if (cleanupRowGenerator) {
+				wideRowGenerator.cleanup();
+			}
+		}
     }
     
     private QueryResultData getProcessedData(ResultSet rs) {
     	DefaultResultPostProc defProc = new DefaultResultPostProc();
+	    QueryResultData qrd = null;
+	    boolean cleanupPostProc = true;
+
     	try {
 			int dbRowsCount = resultPostProc.processResultSet(rs, defProc);
-			QueryResultData qrd = getQueryResultData(resultPostProc.getResultColumns());
+		    qrd = getQueryResultData(resultPostProc.getResultColumns());
 			qrd.setDbRowsCount(dbRowsCount);
 			qrd.dataSource(resultPostProc.getRows());
+		    cleanupPostProc = false;
 			return qrd;
 		} finally {
     		defProc.cleanup();
+			if (cleanupPostProc) {
+				try {
+					resultPostProc.cleanup();
+				} finally {
+					if (qrd != null) {
+						qrd.close();
+					}
+				}
+			}
 		}
     }
 
@@ -330,9 +357,13 @@ public class Query {
 
 		@Override
 		public void cleanup() {
-			if (qrd != null) {
-				qrd.close();
-				qrd = null;
+			try {
+				if (qrd != null) {
+					qrd.close();
+					qrd = null;
+				}
+			} catch (Exception e) {
+				logger.error("Error cleaning the default result post processor", e);
 			}
 		}
 	}

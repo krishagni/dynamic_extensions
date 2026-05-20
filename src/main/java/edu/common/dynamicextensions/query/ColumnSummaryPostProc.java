@@ -67,44 +67,53 @@ public class ColumnSummaryPostProc implements ResultPostProc {
 
 	@Override
 	public int processResultSet(ResultSet rs, ResultPostProc defProc) {
-		DeConfiguration cfg = DeConfiguration.getInstance();
-		qrd = new QueryResultData(getResultColumns(queryExpr), cfg.dateFormat(), cfg.timeFormat(), timeZone);
-		qrd.dataSource(rs);
+		boolean cleanupRequired = true;
+		try {
+			DeConfiguration cfg = DeConfiguration.getInstance();
+			qrd = new QueryResultData(getResultColumns(queryExpr), cfg.dateFormat(), cfg.timeFormat(), timeZone);
+			qrd.dataSource(rs);
 
-		Iterator<Object[]> iter = qrd.rowIterator();
-		while (iter.hasNext()) {
-			Object[] row = iter.next();
-			for (int columnIdx : columnTotals.keySet()) {
-				Number num = (Number)row[columnIdx - 1];
-				if (num == null) {
-					continue;
+			Iterator<Object[]> iter = qrd.rowIterator();
+			while (iter.hasNext()) {
+				Object[] row = iter.next();
+				for (int columnIdx : columnTotals.keySet()) {
+					Number num = (Number)row[columnIdx - 1];
+					if (num == null) {
+						continue;
+					}
+
+					columnTotals.put(columnIdx, columnTotals.get(columnIdx).add(new BigDecimal(num.toString())));
 				}
-				
-				columnTotals.put(columnIdx, columnTotals.get(columnIdx).add(new BigDecimal(num.toString())));
+
+				for (int columnIdx : columnAvgs.keySet()) {
+					Number num = (Number)row[columnIdx - 1];
+					if (num == null) {
+						continue;
+					}
+
+					columnAvgs.put(columnIdx, columnAvgs.get(columnIdx).add(new BigDecimal(num.toString())));
+				}
 			}
-			
-			for (int columnIdx : columnAvgs.keySet()) {
-				Number num = (Number)row[columnIdx - 1];
-				if (num == null) {
-					continue;
+
+			BigDecimal numRows = new BigDecimal(qrd.rows().size());
+			Object[] row = new Object[queryExpr.getSelectList().getElements().size()];
+			for (int i = 0; i < row.length; ++i) {
+				if (columnTotals.containsKey(i + 1)) {
+					row[i] = columnTotals.get(i + 1);
+				} else if (columnAvgs.containsKey(i + 1)) {
+					row[i] = columnAvgs.get(i + 1).divide(numRows, 2, RoundingMode.HALF_UP);
 				}
-				
-				columnAvgs.put(columnIdx, columnAvgs.get(columnIdx).add(new BigDecimal(num.toString())));
+			}
+
+			qrd.rows().add(row); // summary row
+			cleanupRequired = false;
+			return qrd.getDbRowsCount();
+		} finally {
+			if (cleanupRequired && qrd != null) {
+				qrd.close();
+				qrd = null;
 			}
 		}
-		
-		BigDecimal numRows = new BigDecimal(qrd.rows().size());
-		Object[] row = new Object[queryExpr.getSelectList().getElements().size()];
-		for (int i = 0; i < row.length; ++i) {
-			if (columnTotals.containsKey(i + 1)) {
-				row[i] = columnTotals.get(i + 1);
-			} else if (columnAvgs.containsKey(i + 1)) {				
-				row[i] = columnAvgs.get(i + 1).divide(numRows, 2, RoundingMode.HALF_UP);
-			}
-		}
-
-		qrd.rows().add(row); // summary row
-		return qrd.getDbRowsCount();
 	}
 
 	@Override
@@ -119,12 +128,13 @@ public class ColumnSummaryPostProc implements ResultPostProc {
 
 	@Override
 	public void cleanup() {
-		qrd.close();
-		qrd = null;
+		if (qrd != null) {
+			qrd.close();
+			qrd = null;
+		}
+
 		columnTotals.clear();
-		columnTotals = null;
 		columnAvgs.clear();
-		columnAvgs = null;
 	}
 
     private List<ResultColumn> getResultColumns(QueryExpressionNode queryExpr) {

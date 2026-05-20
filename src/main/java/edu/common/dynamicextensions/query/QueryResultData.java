@@ -276,8 +276,9 @@ public class QueryResultData {
 	            this.rows.add(row);
             }    		
     	} catch (Exception e) {
-    		if (rows != null) {
+    		if (this.rows != null) {
     			this.rows.cleanup();
+				this.rows = null;
 			}
 
     		throw new FormException("Error traversing result set", e);
