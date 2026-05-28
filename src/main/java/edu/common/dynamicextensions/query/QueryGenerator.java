@@ -106,6 +106,8 @@ public class QueryGenerator {
 
 	private Map<String, String> autoJoinParams;
 
+	private boolean rewriteInnerJoins;
+
     public QueryGenerator() {
     }
     
@@ -119,6 +121,10 @@ public class QueryGenerator {
 
 	public void setAutoJoinParams(Map<String, String> autoJoinParams) {
 		this.autoJoinParams = autoJoinParams;
+	}
+
+	public void setRewriteInnerJoins(boolean rewriteInnerJoins) {
+		this.rewriteInnerJoins = rewriteInnerJoins;
 	}
 
 	public String getCountSql(QueryExpressionNode queryExpr, JoinTree joinTree) {
@@ -336,7 +342,7 @@ public class QueryGenerator {
         JoinTree parentTree = joinTree.getParent();
         
         if (parentTree != null && !joinTree.isExtensionForm()) {
-        	from.append(" left join ");
+        	from.append(rewriteInnerJoins && joinTree.isInnerJoin() ? " inner join " : " left join ");
         } else if (parentTree != null && joinTree.isExtensionForm()) {
         	//
         	// The parent node is an extension form link (i.e. record entries table)

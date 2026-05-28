@@ -1,7 +1,6 @@
 package edu.common.dynamicextensions.query;
 
 import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.Calendar;
 import java.util.List;
 import java.util.Map;
@@ -11,7 +10,6 @@ import javax.sql.DataSource;
 
 import edu.common.dynamicextensions.ndao.JdbcDao;
 import edu.common.dynamicextensions.ndao.JdbcDaoFactory;
-import edu.common.dynamicextensions.ndao.ResultExtractor;
 import edu.common.dynamicextensions.nutility.LogUtil;
 import edu.common.dynamicextensions.query.ast.ConcatNode;
 import edu.common.dynamicextensions.query.ast.ExpressionNode;
@@ -20,12 +18,14 @@ import edu.common.dynamicextensions.query.ast.QueryExpressionNode;
 
 public class Query {
 	private static final LogUtil logger = LogUtil.getLogger(Query.class);
+
+	private String aql;
     
     private JoinTree queryJoinTree;
 
-    private QueryExpressionNode queryExpr;
+	private QueryExpressionNode queryExpr;
 
-    private WideRowMode wideRowMode;
+	private WideRowMode wideRowMode;
     
     private boolean ic;
 
@@ -52,6 +52,10 @@ public class Query {
 	private int timeoutInSeconds = -1;
 
 	private DataSource dataSource;
+
+	private QueryOptimiser optimiser;
+
+	private QueryOptimisationConfig optimisationConfig;
         
     public static Query createQuery() {
         return new Query();
@@ -128,6 +132,17 @@ public class Query {
 		return this;
 	}
 
+	public Query optimiseQueries(QueryOptimisationConfig config) {
+		this.optimisationConfig = config;
+		return this;
+	}
+
+	public Query optimiser(QueryOptimiser optimiser, QueryOptimisationConfig config) {
+		this.optimiser = optimiser;
+		this.optimisationConfig = config;
+		return this;
+	}
+
     public void compile(String rootFormName, String query) {
         compile(rootFormName, query, null);
     }
@@ -135,6 +150,8 @@ public class Query {
     public void compile(String rootFormName, String query, String restriction) {
         QueryCompiler compiler = new QueryCompiler(qs != null ? qs.getRootForm() : rootFormName, query, restriction);
         compiler.enabledVersionedForms(vcEnabled).pathConfig(pathConfig).querySpace(qs).compile();
+
+	    aql           = query;
         queryExpr     = compiler.getQueryExpr();
         queryJoinTree = compiler.getQueryJoinTree();
         
@@ -184,7 +201,8 @@ public class Query {
 	public long getCount(DataSource dataSource) {
         QueryGenerator gen = new QueryGenerator(false, ic, dateFormat, timeFormat);
         gen.setAutoJoinParams(autoJoinParams);
-        String countSql = gen.getCountSql(queryExpr, queryJoinTree);
+		String sql = gen.getCountSql(queryExpr, queryJoinTree);
+        String countSql = optimiseSql(sql, dataSource, false, false, 0, 0);
 
         long t1 = System.currentTimeMillis();
 		JdbcDao jdbcDao = JdbcDaoFactory.getJdbcDao(dataSource);
@@ -210,7 +228,8 @@ public class Query {
 
 	public QueryResponse getData(int start, int numRows, DataSource dataSource) {
     	final boolean wideRowSupport = isWideRowSupportEnabled();
-        final String dataSql = getDataSql(wideRowSupport, start, numRows);        
+		final String sql = getDataSql(wideRowSupport, start, numRows);
+        final String dataSql = optimiseSql(sql, dataSource, true, wideRowSupport, start, numRows);
         final long t1 = System.currentTimeMillis();
 
 		JdbcDao jdbcDao = JdbcDaoFactory.getJdbcDao(dataSource);
@@ -259,10 +278,43 @@ public class Query {
     }
     
     public String getDataSql(boolean wideRows, int start, int numRows) {
+		return getDataSql(wideRows, start, numRows, false);
+	}
+
+	private String getDataSql(boolean wideRows, int start, int numRows, boolean rewriteInnerJoins) {
         QueryGenerator gen = new QueryGenerator(wideRows, ic, dateFormat, timeFormat);
         gen.setAutoJoinParams(autoJoinParams);
+		gen.setRewriteInnerJoins(rewriteInnerJoins);
         return gen.getDataSql(queryExpr, queryJoinTree, start, numRows);        
     }
+
+	private String optimiseSql(String sql, DataSource dataSource, boolean allowRewrite, boolean wideRows, int start, int numRows) {
+		if (optimisationConfig == null || !optimisationConfig.isEnabled()) {
+			return sql;
+		}
+
+		String candidateSql = sql;
+		if (allowRewrite && optimisationConfig.isRewriteInnerJoins()) {
+			candidateSql = getDataSql(wideRows, start, numRows, true);
+		}
+
+		QueryOptimiser optimiser = this.optimiser != null ? this.optimiser : new DefaultQueryOptimiser();
+		QueryOptimisationResult result = optimiser.optimise(
+			new QueryOptimisationRequest()
+				.sql(candidateSql)
+				.originalSql(sql)
+				.queryExpr(queryExpr)
+				.joinTree(queryJoinTree)
+				.dataSource(dataSource)
+				.config(optimisationConfig)
+		);
+
+		if (result.status() == QueryOptimisationResult.Status.REJECT) {
+			throw new QueryRejectedException(aql, result.sql(), result.explainPlan(), result.reason());
+		}
+
+		return result.sql();
+	}
 
 	private boolean isWideRowSupportEnabled() {
 		return
