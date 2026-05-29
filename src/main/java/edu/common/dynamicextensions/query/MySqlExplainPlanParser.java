@@ -92,6 +92,11 @@ public class MySqlExplainPlanParser {
 			operationBlock.addNode(parseTable(operation.get("table")));
 		}
 
+		boolean hasDirectSource = hasDirectSource(operation);
+		parseOperation(operation, "ordering_operation", operationBlock, !hasDirectSource);
+		parseOperation(operation, "grouping_operation", operationBlock, !hasDirectSource);
+		parseOperation(operation, "duplicates_removal", operationBlock, !hasDirectSource);
+
 		block.addChild(operationBlock);
 	}
 

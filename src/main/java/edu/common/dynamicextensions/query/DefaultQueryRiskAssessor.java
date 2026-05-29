@@ -85,6 +85,8 @@ public class DefaultQueryRiskAssessor implements QueryRiskAssessor {
 			addNodeRejectReasons(node, config, reasons);
 		}
 
+		addSortOrTempRejectReasons(plan, config, reasons);
+
 		if (plan.isUsingFilesort() && config.maxSortRows() > 0 && plan.getMaxRowsProducedPerJoin() > config.maxSortRows()) {
 			reasons.add(
 				"query uses filesort over estimated " + plan.getMaxRowsProducedPerJoin() +
@@ -108,6 +110,26 @@ public class DefaultQueryRiskAssessor implements QueryRiskAssessor {
 		}
 
 		return reasons;
+	}
+
+	private void addSortOrTempRejectReasons(QueryExplainPlan plan, QueryRiskAssessmentConfig config, List<String> reasons) {
+		if (!plan.isUsingFilesort() && !plan.isUsingTemporaryTable()) {
+			return;
+		}
+
+		if (config.maxFullScanRowsForSortOrTemp() <= 0) {
+			return;
+		}
+
+		for (QueryExplainPlanNode node : plan.getNodes()) {
+			if (node.isFullTableScan() && node.getRowsExaminedPerScan() > config.maxFullScanRowsForSortOrTemp()) {
+				reasons.add(
+					"table " + node.getTableName() + " uses full table scan over " +
+					node.getRowsExaminedPerScan() +
+					" rows while query uses filesort/temporary table, exceeding configured limit " +
+					config.maxFullScanRowsForSortOrTemp());
+			}
+		}
 	}
 
 	private void addNodeRejectReasons(QueryExplainPlanNode node, QueryRiskAssessmentConfig config, List<String> reasons) {

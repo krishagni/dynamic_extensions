@@ -27,6 +27,8 @@ public class QueryRiskAssessmentConfig {
 
 	private long maxTempTableRows = 1000000L;
 
+	private long maxFullScanRowsForSortOrTemp = 100000L;
+
 	private long maxDependentSubqueryRows = 100000L;
 
 	private int maxJoinTables = 30;
@@ -103,6 +105,10 @@ public class QueryRiskAssessmentConfig {
 
 		if (values.containsKey("maxTempTableRows")) {
 			config.maxTempTableRows(longValue(values, "maxTempTableRows"));
+		}
+
+		if (values.containsKey("maxFullScanRowsForSortOrTemp")) {
+			config.maxFullScanRowsForSortOrTemp(longValue(values, "maxFullScanRowsForSortOrTemp"));
 		}
 
 		if (values.containsKey("maxDependentSubqueryRows")) {
@@ -201,6 +207,15 @@ public class QueryRiskAssessmentConfig {
 
 	public QueryRiskAssessmentConfig maxTempTableRows(long maxTempTableRows) {
 		this.maxTempTableRows = maxTempTableRows;
+		return this;
+	}
+
+	public long maxFullScanRowsForSortOrTemp() {
+		return maxFullScanRowsForSortOrTemp;
+	}
+
+	public QueryRiskAssessmentConfig maxFullScanRowsForSortOrTemp(long maxFullScanRowsForSortOrTemp) {
+		this.maxFullScanRowsForSortOrTemp = maxFullScanRowsForSortOrTemp;
 		return this;
 	}
 
