@@ -8,14 +8,12 @@ import java.util.Map;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-public class QueryOptimisationConfig {
+public class QueryRiskAssessmentConfig {
 	private static final ObjectMapper mapper = new ObjectMapper();
 
 	private boolean enabled = true;
 
 	private boolean observeOnly;
-
-	private boolean rewriteInnerJoins = true;
 
 	private long largeTableRows = 1000000L;
 
@@ -35,38 +33,42 @@ public class QueryOptimisationConfig {
 
 	private double maxQueryCost = -1.0D;
 
+	private double maxEstimatedJoinWork = -1.0D;
+
+	private long maxJoinBufferRows = 100000L;
+
 	private double minFilteredPercentForFullScan = 10.0D;
 
-	public static QueryOptimisationConfig defaultConfig() {
-		return new QueryOptimisationConfig();
+	public static QueryRiskAssessmentConfig defaultConfig() {
+		return new QueryRiskAssessmentConfig();
 	}
 
-	public static QueryOptimisationConfig fromJson(File file) {
+	public static QueryRiskAssessmentConfig fromJson(File file) {
 		try {
 			return fromMap(mapper.readValue(file, new TypeReference<Map<String, Object>>() {}));
 		} catch (IOException e) {
-			throw new QueryOptimisationException("Error reading query optimisation config: " + file.getAbsolutePath(), e);
+			throw new QueryRiskAssessmentException("Error reading query risk assessment config: " + file.getAbsolutePath(), e);
 		}
 	}
 
-	public static QueryOptimisationConfig fromJson(InputStream input) {
+	public static QueryRiskAssessmentConfig fromJson(InputStream input) {
 		try {
 			return fromMap(mapper.readValue(input, new TypeReference<Map<String, Object>>() {}));
 		} catch (IOException e) {
-			throw new QueryOptimisationException("Error reading query optimisation config", e);
+			throw new QueryRiskAssessmentException("Error reading query risk assessment config", e);
 		}
 	}
 
-	public static QueryOptimisationConfig fromJson(String json) {
+	public static QueryRiskAssessmentConfig fromJson(String json) {
 		try {
 			return fromMap(mapper.readValue(json, new TypeReference<Map<String, Object>>() {}));
 		} catch (IOException e) {
-			throw new QueryOptimisationException("Error reading query optimisation config", e);
+			throw new QueryRiskAssessmentException("Error reading query risk assessment config", e);
 		}
 	}
 
-	public static QueryOptimisationConfig fromMap(Map<String, Object> values) {
-		QueryOptimisationConfig config = defaultConfig();
+	public static QueryRiskAssessmentConfig fromMap(Map<String, Object> values) {
+		QueryRiskAssessmentConfig config = defaultConfig();
 		if (values == null) {
 			return config;
 		}
@@ -77,10 +79,6 @@ public class QueryOptimisationConfig {
 
 		if (values.containsKey("observeOnly")) {
 			config.observeOnly(booleanValue(values, "observeOnly"));
-		}
-
-		if (values.containsKey("rewriteInnerJoins")) {
-			config.rewriteInnerJoins(booleanValue(values, "rewriteInnerJoins"));
 		}
 
 		if (values.containsKey("largeTableRows")) {
@@ -119,6 +117,14 @@ public class QueryOptimisationConfig {
 			config.maxQueryCost(doubleValue(values, "maxQueryCost"));
 		}
 
+		if (values.containsKey("maxEstimatedJoinWork")) {
+			config.maxEstimatedJoinWork(doubleValue(values, "maxEstimatedJoinWork"));
+		}
+
+		if (values.containsKey("maxJoinBufferRows")) {
+			config.maxJoinBufferRows(longValue(values, "maxJoinBufferRows"));
+		}
+
 		if (values.containsKey("minFilteredPercentForFullScan")) {
 			config.minFilteredPercentForFullScan(doubleValue(values, "minFilteredPercentForFullScan"));
 		}
@@ -130,7 +136,7 @@ public class QueryOptimisationConfig {
 		return enabled;
 	}
 
-	public QueryOptimisationConfig enabled(boolean enabled) {
+	public QueryRiskAssessmentConfig enabled(boolean enabled) {
 		this.enabled = enabled;
 		return this;
 	}
@@ -139,17 +145,8 @@ public class QueryOptimisationConfig {
 		return observeOnly;
 	}
 
-	public QueryOptimisationConfig observeOnly(boolean observeOnly) {
+	public QueryRiskAssessmentConfig observeOnly(boolean observeOnly) {
 		this.observeOnly = observeOnly;
-		return this;
-	}
-
-	public boolean isRewriteInnerJoins() {
-		return rewriteInnerJoins;
-	}
-
-	public QueryOptimisationConfig rewriteInnerJoins(boolean rewriteInnerJoins) {
-		this.rewriteInnerJoins = rewriteInnerJoins;
 		return this;
 	}
 
@@ -157,7 +154,7 @@ public class QueryOptimisationConfig {
 		return largeTableRows;
 	}
 
-	public QueryOptimisationConfig largeTableRows(long largeTableRows) {
+	public QueryRiskAssessmentConfig largeTableRows(long largeTableRows) {
 		this.largeTableRows = largeTableRows;
 		return this;
 	}
@@ -166,7 +163,7 @@ public class QueryOptimisationConfig {
 		return maxRowsExaminedPerScan;
 	}
 
-	public QueryOptimisationConfig maxRowsExaminedPerScan(long maxRowsExaminedPerScan) {
+	public QueryRiskAssessmentConfig maxRowsExaminedPerScan(long maxRowsExaminedPerScan) {
 		this.maxRowsExaminedPerScan = maxRowsExaminedPerScan;
 		return this;
 	}
@@ -175,7 +172,7 @@ public class QueryOptimisationConfig {
 		return maxRowsProducedPerJoin;
 	}
 
-	public QueryOptimisationConfig maxRowsProducedPerJoin(long maxRowsProducedPerJoin) {
+	public QueryRiskAssessmentConfig maxRowsProducedPerJoin(long maxRowsProducedPerJoin) {
 		this.maxRowsProducedPerJoin = maxRowsProducedPerJoin;
 		return this;
 	}
@@ -184,7 +181,7 @@ public class QueryOptimisationConfig {
 		return maxTotalRowsExamined;
 	}
 
-	public QueryOptimisationConfig maxTotalRowsExamined(long maxTotalRowsExamined) {
+	public QueryRiskAssessmentConfig maxTotalRowsExamined(long maxTotalRowsExamined) {
 		this.maxTotalRowsExamined = maxTotalRowsExamined;
 		return this;
 	}
@@ -193,7 +190,7 @@ public class QueryOptimisationConfig {
 		return maxSortRows;
 	}
 
-	public QueryOptimisationConfig maxSortRows(long maxSortRows) {
+	public QueryRiskAssessmentConfig maxSortRows(long maxSortRows) {
 		this.maxSortRows = maxSortRows;
 		return this;
 	}
@@ -202,7 +199,7 @@ public class QueryOptimisationConfig {
 		return maxTempTableRows;
 	}
 
-	public QueryOptimisationConfig maxTempTableRows(long maxTempTableRows) {
+	public QueryRiskAssessmentConfig maxTempTableRows(long maxTempTableRows) {
 		this.maxTempTableRows = maxTempTableRows;
 		return this;
 	}
@@ -211,7 +208,7 @@ public class QueryOptimisationConfig {
 		return maxDependentSubqueryRows;
 	}
 
-	public QueryOptimisationConfig maxDependentSubqueryRows(long maxDependentSubqueryRows) {
+	public QueryRiskAssessmentConfig maxDependentSubqueryRows(long maxDependentSubqueryRows) {
 		this.maxDependentSubqueryRows = maxDependentSubqueryRows;
 		return this;
 	}
@@ -220,7 +217,7 @@ public class QueryOptimisationConfig {
 		return maxJoinTables;
 	}
 
-	public QueryOptimisationConfig maxJoinTables(int maxJoinTables) {
+	public QueryRiskAssessmentConfig maxJoinTables(int maxJoinTables) {
 		this.maxJoinTables = maxJoinTables;
 		return this;
 	}
@@ -229,8 +226,26 @@ public class QueryOptimisationConfig {
 		return maxQueryCost;
 	}
 
-	public QueryOptimisationConfig maxQueryCost(double maxQueryCost) {
+	public QueryRiskAssessmentConfig maxQueryCost(double maxQueryCost) {
 		this.maxQueryCost = maxQueryCost;
+		return this;
+	}
+
+	public double maxEstimatedJoinWork() {
+		return maxEstimatedJoinWork;
+	}
+
+	public QueryRiskAssessmentConfig maxEstimatedJoinWork(double maxEstimatedJoinWork) {
+		this.maxEstimatedJoinWork = maxEstimatedJoinWork;
+		return this;
+	}
+
+	public long maxJoinBufferRows() {
+		return maxJoinBufferRows;
+	}
+
+	public QueryRiskAssessmentConfig maxJoinBufferRows(long maxJoinBufferRows) {
+		this.maxJoinBufferRows = maxJoinBufferRows;
 		return this;
 	}
 
@@ -238,7 +253,7 @@ public class QueryOptimisationConfig {
 		return minFilteredPercentForFullScan;
 	}
 
-	public QueryOptimisationConfig minFilteredPercentForFullScan(double minFilteredPercentForFullScan) {
+	public QueryRiskAssessmentConfig minFilteredPercentForFullScan(double minFilteredPercentForFullScan) {
 		this.minFilteredPercentForFullScan = minFilteredPercentForFullScan;
 		return this;
 	}
@@ -251,7 +266,7 @@ public class QueryOptimisationConfig {
 			return Boolean.parseBoolean((String)value);
 		}
 
-		throw new QueryOptimisationException("Invalid boolean value for query optimisation config: " + name);
+		throw new QueryRiskAssessmentException("Invalid boolean value for query risk assessment config: " + name);
 	}
 
 	private static long longValue(Map<String, Object> values, String name) {
@@ -262,7 +277,7 @@ public class QueryOptimisationConfig {
 			return Long.parseLong((String)value);
 		}
 
-		throw new QueryOptimisationException("Invalid long value for query optimisation config: " + name);
+		throw new QueryRiskAssessmentException("Invalid long value for query risk assessment config: " + name);
 	}
 
 	private static int intValue(Map<String, Object> values, String name) {
@@ -273,7 +288,7 @@ public class QueryOptimisationConfig {
 			return Integer.parseInt((String)value);
 		}
 
-		throw new QueryOptimisationException("Invalid integer value for query optimisation config: " + name);
+		throw new QueryRiskAssessmentException("Invalid integer value for query risk assessment config: " + name);
 	}
 
 	private static double doubleValue(Map<String, Object> values, String name) {
@@ -284,6 +299,6 @@ public class QueryOptimisationConfig {
 			return Double.parseDouble((String)value);
 		}
 
-		throw new QueryOptimisationException("Invalid double value for query optimisation config: " + name);
+		throw new QueryRiskAssessmentException("Invalid double value for query risk assessment config: " + name);
 	}
 }

@@ -6,6 +6,8 @@ import java.util.List;
 public class QueryExplainPlan {
 	private String rawPlanText;
 
+	private QueryExplainPlanBlock rootBlock;
+
 	private List<QueryExplainPlanNode> nodes = new ArrayList<>();
 
 	private boolean usingFilesort;
@@ -28,8 +30,13 @@ public class QueryExplainPlan {
 		return nodes;
 	}
 
-	public void addNode(QueryExplainPlanNode node) {
-		nodes.add(node);
+	public QueryExplainPlanBlock rootBlock() {
+		return rootBlock;
+	}
+
+	public void rootBlock(QueryExplainPlanBlock rootBlock) {
+		this.rootBlock = rootBlock;
+		refreshSummary();
 	}
 
 	public boolean isUsingFilesort() {
@@ -80,5 +87,45 @@ public class QueryExplainPlan {
 
 	public void queryCost(double queryCost) {
 		this.queryCost = queryCost;
+	}
+
+	public double getEstimatedJoinWork() {
+		return rootBlock != null ? rootBlock.getEstimatedJoinWork() : 0.0D;
+	}
+
+	public double getEstimatedDependentSubqueryWork() {
+		return rootBlock != null ? rootBlock.getEstimatedDependentSubqueryWork() : 0.0D;
+	}
+
+	private void refreshSummary() {
+		nodes.clear();
+		usingFilesort = false;
+		usingTemporaryTable = false;
+		dependentSubquery = false;
+		queryCost = rootBlock != null ? rootBlock.queryCost() : 0.0D;
+		if (rootBlock != null) {
+			collectSummary(rootBlock);
+		}
+	}
+
+	private void collectSummary(QueryExplainPlanBlock block) {
+		usingFilesort = usingFilesort || block.isUsingFilesort();
+		usingTemporaryTable = usingTemporaryTable || block.isUsingTemporaryTable();
+		dependentSubquery = dependentSubquery || block.isDependent();
+
+		for (QueryExplainPlanNode node : block.nodes()) {
+			nodes.add(node);
+			if (node.materializedFromSubquery() != null) {
+				collectSummary(node.materializedFromSubquery());
+			}
+
+			for (QueryExplainPlanBlock attachedSubquery : node.attachedSubqueries()) {
+				collectSummary(attachedSubquery);
+			}
+		}
+
+		for (QueryExplainPlanBlock child : block.children()) {
+			collectSummary(child);
+		}
 	}
 }

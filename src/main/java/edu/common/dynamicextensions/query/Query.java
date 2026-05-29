@@ -53,9 +53,9 @@ public class Query {
 
 	private DataSource dataSource;
 
-	private QueryOptimiser optimiser;
+	private QueryRiskAssessor riskAssessor;
 
-	private QueryOptimisationConfig optimisationConfig;
+	private QueryRiskAssessmentConfig riskAssessmentConfig;
         
     public static Query createQuery() {
         return new Query();
@@ -132,14 +132,14 @@ public class Query {
 		return this;
 	}
 
-	public Query optimiseQueries(QueryOptimisationConfig config) {
-		this.optimisationConfig = config;
+	public Query assessQueryRisk(QueryRiskAssessmentConfig config) {
+		this.riskAssessmentConfig = config;
 		return this;
 	}
 
-	public Query optimiser(QueryOptimiser optimiser, QueryOptimisationConfig config) {
-		this.optimiser = optimiser;
-		this.optimisationConfig = config;
+	public Query riskAssessor(QueryRiskAssessor riskAssessor, QueryRiskAssessmentConfig config) {
+		this.riskAssessor = riskAssessor;
+		this.riskAssessmentConfig = config;
 		return this;
 	}
 
@@ -199,10 +199,10 @@ public class Query {
 	}
 
 	public long getCount(DataSource dataSource) {
-        QueryGenerator gen = new QueryGenerator(false, ic, dateFormat, timeFormat);
-        gen.setAutoJoinParams(autoJoinParams);
+		QueryGenerator gen = new QueryGenerator(false, ic, dateFormat, timeFormat);
+		gen.setAutoJoinParams(autoJoinParams);
 		String sql = gen.getCountSql(queryExpr, queryJoinTree);
-        String countSql = optimiseSql(sql, dataSource, false, false, 0, 0);
+        String countSql = assessSqlRisk(sql, dataSource);
 
         long t1 = System.currentTimeMillis();
 		JdbcDao jdbcDao = JdbcDaoFactory.getJdbcDao(dataSource);
@@ -229,7 +229,7 @@ public class Query {
 	public QueryResponse getData(int start, int numRows, DataSource dataSource) {
     	final boolean wideRowSupport = isWideRowSupportEnabled();
 		final String sql = getDataSql(wideRowSupport, start, numRows);
-        final String dataSql = optimiseSql(sql, dataSource, true, wideRowSupport, start, numRows);
+        final String dataSql = assessSqlRisk(sql, dataSource);
         final long t1 = System.currentTimeMillis();
 
 		JdbcDao jdbcDao = JdbcDaoFactory.getJdbcDao(dataSource);
@@ -278,38 +278,27 @@ public class Query {
     }
     
     public String getDataSql(boolean wideRows, int start, int numRows) {
-		return getDataSql(wideRows, start, numRows, false);
-	}
-
-	private String getDataSql(boolean wideRows, int start, int numRows, boolean rewriteInnerJoins) {
         QueryGenerator gen = new QueryGenerator(wideRows, ic, dateFormat, timeFormat);
         gen.setAutoJoinParams(autoJoinParams);
-		gen.setRewriteInnerJoins(rewriteInnerJoins);
         return gen.getDataSql(queryExpr, queryJoinTree, start, numRows);        
     }
 
-	private String optimiseSql(String sql, DataSource dataSource, boolean allowRewrite, boolean wideRows, int start, int numRows) {
-		if (optimisationConfig == null || !optimisationConfig.isEnabled()) {
+	private String assessSqlRisk(String sql, DataSource dataSource) {
+		if (riskAssessmentConfig == null || !riskAssessmentConfig.isEnabled()) {
 			return sql;
 		}
 
-		String candidateSql = sql;
-		if (allowRewrite && optimisationConfig.isRewriteInnerJoins()) {
-			candidateSql = getDataSql(wideRows, start, numRows, true);
-		}
-
-		QueryOptimiser optimiser = this.optimiser != null ? this.optimiser : new DefaultQueryOptimiser();
-		QueryOptimisationResult result = optimiser.optimise(
-			new QueryOptimisationRequest()
-				.sql(candidateSql)
-				.originalSql(sql)
+		QueryRiskAssessor riskAssessor = this.riskAssessor != null ? this.riskAssessor : new DefaultQueryRiskAssessor();
+		QueryRiskAssessmentResult result = riskAssessor.assess(
+			new QueryRiskAssessmentRequest()
+				.sql(sql)
 				.queryExpr(queryExpr)
 				.joinTree(queryJoinTree)
 				.dataSource(dataSource)
-				.config(optimisationConfig)
+				.config(riskAssessmentConfig)
 		);
 
-		if (result.status() == QueryOptimisationResult.Status.REJECT) {
+		if (result.status() == QueryRiskAssessmentResult.Status.REJECT) {
 			throw new QueryRejectedException(aql, result.sql(), result.explainPlan(), result.reason());
 		}
 

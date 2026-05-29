@@ -7,14 +7,17 @@ public class QueryRejectedException extends RuntimeException {
 
 	private QueryExplainPlan explainPlan;
 
+	private QueryRiskAssessmentMetrics metrics;
+
 	private String reason;
 
 	public QueryRejectedException(String aql, String sql, QueryExplainPlan explainPlan, String reason) {
-		super("Query rejected by optimiser: " + reason);
+		super("Query rejected by risk assessor: " + reason);
 
 		this.aql = aql;
 		this.sql = sql;
 		this.explainPlan = explainPlan;
+		this.metrics = QueryRiskAssessmentMetrics.from(explainPlan);
 		this.reason = reason;
 	}
 
@@ -32,6 +35,10 @@ public class QueryRejectedException extends RuntimeException {
 
 	public String explainPlanText() {
 		return explainPlan != null ? explainPlan.rawPlanText() : null;
+	}
+
+	public QueryRiskAssessmentMetrics metrics() {
+		return metrics;
 	}
 
 	public String reason() {

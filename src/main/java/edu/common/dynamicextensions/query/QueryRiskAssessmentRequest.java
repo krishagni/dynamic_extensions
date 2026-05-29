@@ -4,10 +4,8 @@ import javax.sql.DataSource;
 
 import edu.common.dynamicextensions.query.ast.QueryExpressionNode;
 
-public class QueryOptimisationRequest {
+public class QueryRiskAssessmentRequest {
 	private String sql;
-
-	private String originalSql;
 
 	private QueryExpressionNode queryExpr;
 
@@ -15,23 +13,14 @@ public class QueryOptimisationRequest {
 
 	private DataSource dataSource;
 
-	private QueryOptimisationConfig config;
+	private QueryRiskAssessmentConfig config;
 
 	public String sql() {
 		return sql;
 	}
 
-	public QueryOptimisationRequest sql(String sql) {
+	public QueryRiskAssessmentRequest sql(String sql) {
 		this.sql = sql;
-		return this;
-	}
-
-	public String originalSql() {
-		return originalSql;
-	}
-
-	public QueryOptimisationRequest originalSql(String originalSql) {
-		this.originalSql = originalSql;
 		return this;
 	}
 
@@ -39,7 +28,7 @@ public class QueryOptimisationRequest {
 		return queryExpr;
 	}
 
-	public QueryOptimisationRequest queryExpr(QueryExpressionNode queryExpr) {
+	public QueryRiskAssessmentRequest queryExpr(QueryExpressionNode queryExpr) {
 		this.queryExpr = queryExpr;
 		return this;
 	}
@@ -48,7 +37,7 @@ public class QueryOptimisationRequest {
 		return joinTree;
 	}
 
-	public QueryOptimisationRequest joinTree(JoinTree joinTree) {
+	public QueryRiskAssessmentRequest joinTree(JoinTree joinTree) {
 		this.joinTree = joinTree;
 		return this;
 	}
@@ -57,16 +46,16 @@ public class QueryOptimisationRequest {
 		return dataSource;
 	}
 
-	public QueryOptimisationRequest dataSource(DataSource dataSource) {
+	public QueryRiskAssessmentRequest dataSource(DataSource dataSource) {
 		this.dataSource = dataSource;
 		return this;
 	}
 
-	public QueryOptimisationConfig config() {
+	public QueryRiskAssessmentConfig config() {
 		return config;
 	}
 
-	public QueryOptimisationRequest config(QueryOptimisationConfig config) {
+	public QueryRiskAssessmentRequest config(QueryRiskAssessmentConfig config) {
 		this.config = config;
 		return this;
 	}

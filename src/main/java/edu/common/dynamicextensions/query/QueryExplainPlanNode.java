@@ -20,6 +20,12 @@ public class QueryExplainPlanNode {
 
 	private String attachedCondition;
 
+	private String usingJoinBuffer;
+
+	private QueryExplainPlanBlock materializedFromSubquery;
+
+	private List<QueryExplainPlanBlock> attachedSubqueries = new ArrayList<>();
+
 	public String getTableName() {
 		return tableName;
 	}
@@ -90,5 +96,33 @@ public class QueryExplainPlanNode {
 
 	public boolean isMissingUsableKey() {
 		return key == null && !possibleKeys.isEmpty();
+	}
+
+	public String usingJoinBuffer() {
+		return usingJoinBuffer;
+	}
+
+	public void usingJoinBuffer(String usingJoinBuffer) {
+		this.usingJoinBuffer = usingJoinBuffer;
+	}
+
+	public boolean isUsingJoinBuffer() {
+		return usingJoinBuffer != null && !usingJoinBuffer.trim().isEmpty();
+	}
+
+	public QueryExplainPlanBlock materializedFromSubquery() {
+		return materializedFromSubquery;
+	}
+
+	public void materializedFromSubquery(QueryExplainPlanBlock materializedFromSubquery) {
+		this.materializedFromSubquery = materializedFromSubquery;
+	}
+
+	public List<QueryExplainPlanBlock> attachedSubqueries() {
+		return attachedSubqueries;
+	}
+
+	public void addAttachedSubquery(QueryExplainPlanBlock attachedSubquery) {
+		attachedSubqueries.add(attachedSubquery);
 	}
 }

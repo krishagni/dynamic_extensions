@@ -1,7 +1,6 @@
 package edu.common.dynamicextensions.query;
 
 import java.io.IOException;
-import java.util.Iterator;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -11,53 +10,136 @@ public class MySqlExplainPlanParser {
 
 	public QueryExplainPlan parse(String explainJson) {
 		try {
+			JsonNode root = mapper.readTree(explainJson);
+
 			QueryExplainPlan plan = new QueryExplainPlan();
 			plan.rawPlanText(explainJson);
-			collect(mapper.readTree(explainJson), plan);
+			plan.rootBlock(parseQueryBlock(root.path("query_block"), "query_block"));
 			return plan;
 		} catch (IOException e) {
-			throw new QueryOptimisationException("Error parsing MySQL explain plan", e);
+			throw new QueryRiskAssessmentException("Error parsing MySQL explain plan", e);
 		}
 	}
 
-	private void collect(JsonNode json, QueryExplainPlan plan) {
+	private QueryExplainPlanBlock parseQueryBlock(JsonNode queryBlock, String type) {
+		QueryExplainPlanBlock block = new QueryExplainPlanBlock(type);
+		collectOperationFlags(queryBlock, block);
+		boolean hasDirectSource = hasDirectSource(queryBlock);
+
+		if (queryBlock.has("nested_loop")) {
+			for (JsonNode item : queryBlock.get("nested_loop")) {
+				parseQueryBlockItem(item, block);
+			}
+		}
+
+		if (queryBlock.has("table")) {
+			block.addNode(parseTable(queryBlock.get("table")));
+		}
+
+		if (queryBlock.has("union_result")) {
+			block.addChild(parseUnionResult(queryBlock.get("union_result")));
+		}
+
+		parseOperation(queryBlock, "ordering_operation", block, !hasDirectSource);
+		parseOperation(queryBlock, "grouping_operation", block, !hasDirectSource);
+		parseOperation(queryBlock, "duplicates_removal", block, !hasDirectSource);
+		return block;
+	}
+
+	private void parseQueryBlockItem(JsonNode item, QueryExplainPlanBlock block) {
+		if (item.has("table")) {
+			block.addNode(parseTable(item.get("table")));
+		}
+
+		if (item.has("query_block")) {
+			block.addChild(parseQueryBlock(item.get("query_block"), "query_block"));
+		}
+
+		if (item.has("union_result")) {
+			block.addChild(parseUnionResult(item.get("union_result")));
+		}
+
+		boolean hasDirectSource = hasDirectSource(item);
+		parseOperation(item, "ordering_operation", block, !hasDirectSource);
+		parseOperation(item, "grouping_operation", block, !hasDirectSource);
+		parseOperation(item, "duplicates_removal", block, !hasDirectSource);
+	}
+
+	private void parseOperation(JsonNode parent, String name, QueryExplainPlanBlock block, boolean parseSource) {
+		JsonNode operation = parent.get(name);
+		if (operation == null || operation.isNull()) {
+			return;
+		}
+
+		QueryExplainPlanBlock operationBlock = new QueryExplainPlanBlock(name);
+		collectOperationFlags(operation, operationBlock);
+		if (!parseSource) {
+			block.addChild(operationBlock);
+			return;
+		}
+
+		if (operation.has("nested_loop")) {
+			for (JsonNode item : operation.get("nested_loop")) {
+				parseQueryBlockItem(item, operationBlock);
+			}
+		}
+
+		if (operation.has("query_block")) {
+			operationBlock.addChild(parseQueryBlock(operation.get("query_block"), "query_block"));
+		}
+
+		if (operation.has("table")) {
+			operationBlock.addNode(parseTable(operation.get("table")));
+		}
+
+		block.addChild(operationBlock);
+	}
+
+	private boolean hasDirectSource(JsonNode json) {
+		return json.has("nested_loop") || json.has("table") || json.has("union_result");
+	}
+
+	private QueryExplainPlanBlock parseUnionResult(JsonNode unionResult) {
+		QueryExplainPlanBlock block = new QueryExplainPlanBlock("union_result");
+		collectOperationFlags(unionResult, block);
+
+		JsonNode specifications = unionResult.get("query_specifications");
+		if (specifications != null && specifications.isArray()) {
+			for (JsonNode specification : specifications) {
+				if (specification.has("query_block")) {
+					block.addChild(parseQueryBlock(specification.get("query_block"), "query_specification"));
+				}
+			}
+		}
+
+		return block;
+	}
+
+	private void collectOperationFlags(JsonNode json, QueryExplainPlanBlock block) {
 		if (json == null || json.isNull()) {
 			return;
 		}
 
-		if (json.isObject()) {
-			collectOperationFlags(json, plan);
-			if (json.has("table")) {
-				plan.addNode(parseTable(json.get("table")));
-			}
-
-			Iterator<JsonNode> elements = json.elements();
-			while (elements.hasNext()) {
-				collect(elements.next(), plan);
-			}
-		} else if (json.isArray()) {
-			for (JsonNode child : json) {
-				collect(child, plan);
-			}
-		}
-	}
-
-	private void collectOperationFlags(JsonNode json, QueryExplainPlan plan) {
 		JsonNode queryCost = json.path("cost_info").get("query_cost");
 		if (queryCost != null && !queryCost.isNull()) {
-			plan.queryCost(queryCost.asDouble());
+			block.queryCost(queryCost.asDouble());
 		}
 
 		if (json.path("using_filesort").asBoolean(false)) {
-			plan.setUsingFilesort(true);
+			block.setUsingFilesort(true);
 		}
 
-		if (json.has("temporary_table")) {
-			plan.setUsingTemporaryTable(true);
+		if (json.path("using_temporary_table").asBoolean(false) || json.has("temporary_table")) {
+			block.setUsingTemporaryTable(true);
 		}
 
 		if (json.path("dependent").asBoolean(false)) {
-			plan.setDependentSubquery(true);
+			block.setDependent(true);
+		}
+
+		JsonNode cacheable = json.get("cacheable");
+		if (cacheable != null && !cacheable.isNull()) {
+			block.cacheable(cacheable.asBoolean());
 		}
 	}
 
@@ -70,6 +152,7 @@ public class MySqlExplainPlanParser {
 		node.setRowsProducedPerJoin(table.path("rows_produced_per_join").asLong(0L));
 		node.setFiltered(table.path("filtered").asDouble(100.0D));
 		node.setAttachedCondition(text(table, "attached_condition"));
+		node.usingJoinBuffer(text(table, "using_join_buffer"));
 
 		JsonNode possibleKeys = table.get("possible_keys");
 		if (possibleKeys != null && possibleKeys.isArray()) {
@@ -78,7 +161,41 @@ public class MySqlExplainPlanParser {
 			}
 		}
 
+		parseMaterializedSubquery(table, node);
+		parseAttachedSubqueries(table, node);
 		return node;
+	}
+
+	private void parseMaterializedSubquery(JsonNode table, QueryExplainPlanNode node) {
+		JsonNode materialized = table.get("materialized_from_subquery");
+		if (materialized == null || materialized.isNull()) {
+			return;
+		}
+
+		QueryExplainPlanBlock block = new QueryExplainPlanBlock("materialized_from_subquery");
+		collectOperationFlags(materialized, block);
+		if (materialized.has("query_block")) {
+			block.addChild(parseQueryBlock(materialized.get("query_block"), "query_block"));
+		}
+
+		node.materializedFromSubquery(block);
+	}
+
+	private void parseAttachedSubqueries(JsonNode table, QueryExplainPlanNode node) {
+		JsonNode attachedSubqueries = table.get("attached_subqueries");
+		if (attachedSubqueries == null || !attachedSubqueries.isArray()) {
+			return;
+		}
+
+		for (JsonNode attachedSubquery : attachedSubqueries) {
+			QueryExplainPlanBlock block = new QueryExplainPlanBlock("attached_subquery");
+			collectOperationFlags(attachedSubquery, block);
+			if (attachedSubquery.has("query_block")) {
+				block.addChild(parseQueryBlock(attachedSubquery.get("query_block"), "query_block"));
+			}
+
+			node.addAttachedSubquery(block);
+		}
 	}
 
 	private String text(JsonNode json, String field) {
