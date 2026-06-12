@@ -9,4 +9,18 @@
   <changeSet author="vpawar" id="Migrate multi-select field table indexes">
     <customChange class="edu.common.dynamicextensions.upgrade.MigrateMultiSelectTableIndexes" />
   </changeSet>
+
+  <changeSet author="vpawar" id="Index on audit events timestamp form and user">
+    <preConditions onFail="MARK_RAN">
+      <not>
+        <indexExists tableName="DYEXTN_AUDIT_EVENTS" columnNames="EVENT_TIMESTAMP,FORM_ID,USER_ID" />
+      </not>
+    </preConditions>
+
+    <createIndex tableName="DYEXTN_AUDIT_EVENTS" indexName="DYEXTN_AUDIT_REPORT_IDX">
+      <column name="EVENT_TIMESTAMP"/>
+      <column name="FORM_ID"/>
+      <column name="USER_ID"/>
+    </createIndex>
+  </changeSet>
 </databaseChangeLog>
