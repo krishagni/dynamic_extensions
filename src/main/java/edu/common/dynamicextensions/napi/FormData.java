@@ -319,6 +319,10 @@ public class FormData {
 				fieldData.put("format", ((DatePicker) ctrl).getFormat());
 			}
 
+			if (ctrl.getRecordUrl() != null && ctrl.getRecordUrl().length() > 0) {
+				fieldData.put("url", ctrl.getRecordUrl());
+			}
+
 			Object value = fieldValue.getValue();
 			if (value instanceof FileControlValue fcv) {
 				value = fcv.toValueMap();
