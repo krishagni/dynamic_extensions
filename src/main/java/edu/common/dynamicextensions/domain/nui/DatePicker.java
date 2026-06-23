@@ -6,7 +6,9 @@ import java.io.Writer;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.Calendar;
@@ -158,12 +160,28 @@ public class DatePicker extends Control implements Serializable {
 				try {
 					date = LocalDate.parse(value);
 				} catch (Exception e2) {
-					String id = "Form: " + getContainer().getName() + ", Field: " + getName() + ". ";
-					throw new FormException(id + "Error creating LocalDate from [" + value + "]. Format: " + fmt, e);
+					date = parseEpochMillisAsUtcDate(value);
+					if (date == null) {
+						String id = "Form: " + getContainer().getName() + ", Field: " + getName() + ". ";
+						throw new FormException(id + "Error creating LocalDate from [" + value + "]. Format: " + fmt, e);
+					}
 				}
 			}
 
 			return DbSettingsFactory.isOracle() ? java.sql.Date.valueOf(date) : date;
+		}
+	}
+
+	private LocalDate parseEpochMillisAsUtcDate(String value) {
+		try {
+			Instant instant = Instant.ofEpochMilli(Long.parseLong(value));
+			if (!instant.atZone(ZoneOffset.UTC).toLocalTime().equals(LocalTime.MIDNIGHT)) {
+				return null;
+			}
+
+			return instant.atZone(ZoneOffset.UTC).toLocalDate();
+		} catch (Exception e) {
+			return null;
 		}
 	}
 	
