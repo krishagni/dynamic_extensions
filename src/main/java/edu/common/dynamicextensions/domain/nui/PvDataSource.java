@@ -116,6 +116,42 @@ public class PvDataSource implements Serializable {
 		return getPermissibleValues(Calendar.getInstance().getTime(), queries, maxPvs);
 	}
 
+	public List<PermissibleValue> getExactPermissibleValues(List<String> queries, int maxPvs) {
+		return getExactPermissibleValues(Calendar.getInstance().getTime(), queries, maxPvs);
+	}
+
+	public List<PermissibleValue> getExactPermissibleValues(Date activationDate, List<String> queries, int maxPvs) {
+		if (queries == null || queries.isEmpty()) {
+			return Collections.emptyList();
+		}
+
+		if (sql != null) {
+			String columnName = getColumnName(sql);
+
+			String searchClause = DbSettingsFactory.isOracle() ? "upper(t.%s) = ?" : "t.%s = ?";
+			String exactClauses = queries.stream()
+				.map(query -> String.format(searchClause, columnName))
+				.collect(Collectors.joining(" or "));
+			String exactSql = String.format(SEARCH_QUERY, sql, exactClauses);
+			List<String> params = queries;
+			if (DbSettingsFactory.isOracle()) {
+				params = queries.stream().map(query -> query.toUpperCase(Locale.ROOT)).collect(Collectors.toList());
+			}
+
+			return getPvsFromDb(exactSql, params, maxPvs);
+		}
+
+		List<PermissibleValue> pvs = getPvVersion(activationDate).getPermissibleValues();
+		return pvs.stream()
+			.filter(
+				pv -> queries.stream().anyMatch(
+					query -> query.equalsIgnoreCase(pv.getValue()) || query.equalsIgnoreCase(pv.getConceptCode())
+				)
+			)
+			.limit(maxPvs)
+			.collect(Collectors.toList());
+	}
+
 	public List<PermissibleValue> getPermissibleValues(Date activationDate, String searchStr, int maxPvs) {
 		List<String> queries = StringUtils.isNotBlank(searchStr) ? Collections.singletonList(searchStr) : null;
 		return getPermissibleValues(activationDate, queries, maxPvs);
@@ -276,10 +312,14 @@ public class PvDataSource implements Serializable {
 	}
 
 	private String getColumnName(String sql) {
-		return JdbcDaoFactory.getJdbcDao().getResultSet(getLimitQuery(sql, 1), null, (rs) -> {
-			ResultSetMetaData rsmd = rs.getMetaData();
-			return rsmd.getColumnName(1);
-		});
+		return JdbcDaoFactory.getJdbcDao().getResultSet(
+			getLimitQuery(sql, 1),
+			null,
+			(rs) -> {
+				ResultSetMetaData rsmd = rs.getMetaData();
+				return rsmd.getColumnName(1);
+			}
+		);
 	}
 
 	private void sort(List<PermissibleValue> pvs) {
