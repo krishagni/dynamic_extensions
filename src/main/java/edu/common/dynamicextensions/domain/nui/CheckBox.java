@@ -42,7 +42,7 @@ public class CheckBox extends Control implements Serializable {
 	@SuppressWarnings("unchecked")
 	@Override
 	public Boolean fromString(String value) {
-		return (value != null) && (value.equals("1") || value.equalsIgnoreCase("true"));
+		return (value != null) && (value.equals("1") || value.equalsIgnoreCase("true") || value.equalsIgnoreCase("yes"));
 	}
 	
 	@Override
@@ -52,7 +52,7 @@ public class CheckBox extends Control implements Serializable {
 			return val == 0 ? "0" : "1";
 		} else if (value != null) {
 			String valStr = value.toString().toLowerCase().trim();
-			return valStr.equals("true") || valStr.equals("1") ? "1" : "0";
+			return valStr.equalsIgnoreCase("true") || valStr.equals("1") || valStr.equalsIgnoreCase("yes") ? "1" : "0";
 		}
 
 		return null;
@@ -115,10 +115,12 @@ public class CheckBox extends Control implements Serializable {
 		}
 		
 		String valStr = value.toString().trim();
-		if (!valStr.equals("true") && 
-			!valStr.equals("false") && 
+		if (!valStr.equalsIgnoreCase("true") &&
+			!valStr.equalsIgnoreCase("false") &&
 			!valStr.equals("1") && 
-			!valStr.equals("0")) {
+			!valStr.equals("0") &&
+		    !valStr.equalsIgnoreCase("yes") &&
+		    !valStr.equalsIgnoreCase("no")) {
 			return ValidationStatus.INVALID_VALUE;
 		}
 		
