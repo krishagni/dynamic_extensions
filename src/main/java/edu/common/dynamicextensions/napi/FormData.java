@@ -2,12 +2,14 @@ package edu.common.dynamicextensions.napi;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import org.apache.commons.lang3.StringUtils;
 import com.google.gson.Gson;
@@ -223,9 +225,27 @@ public class FormData {
 					
 					formData.addFieldValue(new ControlValue(ctrl, subFormData));					
 				}
-			} else if (ctrl instanceof MultiSelectControl) {				
-				List<String> values = (List<String>)fieldValue.getValue();
-				formData.addFieldValue(new ControlValue(ctrl, values == null ? null : values.toArray(new String[0])));
+			} else if (ctrl instanceof MultiSelectControl || (ctrl instanceof AbstractLookupControl luCtrl && luCtrl.isMultiValued())) {
+				Object input = fieldValue.getValue();
+				Collection<?> values = null;
+				if (input == null) {
+				} else if (input instanceof Collection) {
+					values = (Collection<?>) input;
+				} else if (input.getClass().isArray()) {
+					values = Arrays.asList((Object[]) input);
+				}
+
+				AbstractLookupControl luCtrl = ctrl instanceof  AbstractLookupControl ? (AbstractLookupControl) ctrl : null;
+				String[] result = null;
+				if (values != null) {
+					result = values.stream()
+						.map(value -> luCtrl != null ? luCtrl.getValue(value) : value)
+						.filter(Objects::nonNull)
+						.map(Object::toString)
+						.toArray(String[]::new);
+				}
+
+				formData.addFieldValue(new ControlValue(ctrl, result));
 			} else if (ctrl instanceof FileUploadControl) {
 				FileControlValue fcv = null;
 				if (fieldValue.getValue() instanceof Map) {

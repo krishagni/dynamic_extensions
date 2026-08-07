@@ -580,13 +580,16 @@ public class QueryGenerator {
 
 	private boolean isMvFilter(FilterNode filter) {
 		ExpressionNode lhsNode = filter.getLhs();
-		return lhsNode instanceof FieldNode &&
-				((FieldNode) lhsNode).getCtrl() instanceof MultiSelectControl &&
+		return lhsNode instanceof FieldNode fieldNode && isMultiValued(fieldNode.getCtrl()) &&
 				filter.getRelOp() != RelationalOp.EXISTS &&
 				filter.getRelOp() != RelationalOp.NOT_EXISTS &&
 				filter.getRelOp() != RelationalOp.ANY &&
 				filter.getSubQuery() == null &&
 				StringUtils.isBlank(filter.getSql());
+	}
+
+	private boolean isMultiValued(Control ctrl) {
+		return ctrl instanceof MultiSelectControl || (ctrl instanceof LookupControl luCtrl && luCtrl.isMultiValued());
 	}
 
 	private String buildMvFilter(JoinTree tree, FilterNode filter) {
@@ -599,6 +602,59 @@ public class QueryGenerator {
 		}
 
 		String innerTabAlias = "itab" + innerTabCount++;
+		Control ctrl = ((FieldNode) lhsNode).getCtrl();
+		if (ctrl instanceof LookupControl luCtrl && luCtrl.isMultiValued()) {
+			//
+			// A multi-valued lookup involves three tables/nodes:
+			//
+			// parent form       collection table         lookup table
+			// t0.IDENTIFIER <-- c.RECORD_ID, c.VALUE --> l.IDENTIFIER
+			// l.NAME
+			//
+			// For example, suppose a form record can have many Sites and the user filters
+			// Site = "Boston". The collection table stores site IDs, whereas the lookup
+			// table stores their display names. The generated predicate is equivalent to:
+			//
+			// exists (
+			//   select c.RECORD_ID
+			//   from DE_E_42 c
+			//   inner join CATISSUE_SITE l on l.IDENTIFIER = c.VALUE
+			//   where l.NAME = 'Boston' and c.RECORD_ID = t0.IDENTIFIER
+			// )
+			//
+			// fieldTab is the lookup-table node. Its parent is therefore the intermediate
+			// collection-table node required by the correlated subquery.
+			//
+			JoinTree collectionTab = fieldTab.getParent();
+			String collectionAlias = "itab" + innerTabCount++;
+
+			// Rebuild the filter using the lookup-table alias local to the subquery.
+			FieldNode sqLhsNode = new FieldNode();
+			sqLhsNode.setCtrl(ctrl);
+			sqLhsNode.setTabAlias(innerTabAlias);
+
+			//
+			// A negative collection predicate means "the parent has no matching value".
+			// Thus Site != "Boston" becomes NOT EXISTS (... WHERE l.NAME = 'Boston'),
+			// and NOT IN becomes NOT EXISTS (... WHERE l.NAME IN (...)). Applying !=
+			// inside the subquery would incorrectly match any other selected site.
+			//
+			RelationalOp sqRelOp = filter.getRelOp();
+			FilterNode sqFilter = new FilterNode();
+			sqFilter.setLhs(sqLhsNode);
+			sqFilter.setRelOp(sqRelOp == RelationalOp.NE ? RelationalOp.EQ : (sqRelOp == RelationalOp.NOT_IN ? RelationalOp.IN : sqRelOp));
+			sqFilter.setRhs(filter.getRhs());
+
+			// Correlate the collection row back to the form record in the outer query.
+			String parentKey = collectionTab.getParent().getAlias() + "." + collectionTab.getParentKey();
+			String foreignKey = collectionAlias + "." + collectionTab.getForeignKey();
+			return String.format(
+				"(%s (select %s from %s %s inner join %s %s on %s.%s = %s.%s where %s and %s = %s))",
+				clause, foreignKey, collectionTab.getTab(), collectionAlias, fieldTab.getTab(), innerTabAlias,
+				innerTabAlias, luCtrl.getLookupKey(), collectionAlias, luCtrl.getCollectionValueColumn(),
+				buildFilter0(sqFilter), foreignKey, parentKey);
+		}
+
 		FieldNode sqLhsNode = new FieldNode();
 		sqLhsNode.setCtrl(((FieldNode) lhsNode).getCtrl());
 		sqLhsNode.setTabAlias(innerTabAlias);

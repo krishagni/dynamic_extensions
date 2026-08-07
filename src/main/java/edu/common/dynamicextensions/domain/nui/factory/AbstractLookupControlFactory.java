@@ -1,5 +1,6 @@
 package edu.common.dynamicextensions.domain.nui.factory;
 
+import java.util.Map;
 import java.util.Properties;
 
 import org.w3c.dom.Element;
@@ -12,18 +13,20 @@ public abstract class AbstractLookupControlFactory extends AbstractControlFactor
 
 	@Override
 	public Control parseControl(Element ele, int row, int xPos, Properties props) {
-		Control ctrl = createControl();
+		AbstractLookupControl ctrl = (AbstractLookupControl) createControl();
 		super.setControlProps(ctrl, ele, row, xPos);
+		ctrl.setMultiValued(ParserUtil.getBooleanValue(ele, "multiple"));
+		ctrl.setCollectionTable(ParserUtil.getTextValue(ele, "collectionTable"));
+		ctrl.setCollectionKey(ParserUtil.getTextValue(ele, "collectionKey"));
+		ctrl.setParentKey(ParserUtil.getTextValue(ele, "parentKey"));
+		return ctrl;
+	}
 
-		if (ctrl instanceof AbstractLookupControl) {
-			AbstractLookupControl luCtrl = (AbstractLookupControl) ctrl;
-			luCtrl.setMultiValued(ParserUtil.getBooleanValue(ele, "multiple"));
-			luCtrl.setCollectionTable(ParserUtil.getTextValue(ele, "collectionTable"));
-			luCtrl.setCollectionKey(ParserUtil.getTextValue(ele, "collectionKey"));
-			luCtrl.setParentKey(ParserUtil.getTextValue(ele, "parentKey"));
-		}
-
-
+	@Override
+	public Control parseControl(Map<String, Object> props, int row, int xPos) {
+		AbstractLookupControl ctrl = (AbstractLookupControl) createControl();
+		super.setControlProps(ctrl, props, row, xPos);
+		ctrl.setMultiValued(getBool(props, "multiple", false));
 		return ctrl;
 	}
 

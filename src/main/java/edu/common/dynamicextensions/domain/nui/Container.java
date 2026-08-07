@@ -692,15 +692,32 @@ public class Container implements Serializable {
 
 				add(editLog, control);
 			} else {
-				throw new FormException("Form: " + getName() + ". Changing field " + existingControl.getName() + " type from " +
-					existingControl.getCtrlType() + " to " + control.getCtrlType() +
+				throw new FormException(
+					"Form: " + getName() + ". Changing field " + existingControl.getName() +
+					" from " + existingControl.getCtrlType() +
+					" to " + control.getCtrlType() +
 					" is not allowed");
 			}
 		} else {
 			//
 			// saved control is edited
 			//
-			if (existingControl instanceof MultiSelectControl existingMsCtrl) {
+			if (existingControl instanceof LookupControl oldLookup && control instanceof LookupControl newLookup) {
+				if (oldLookup.isMultiValued() != newLookup.isMultiValued()) {
+					throw new FormException(
+						"Form: " + getName() + ". Changing field " + existingControl.getName() +
+						" from " + (oldLookup.isMultiValued() ? "multi-valued" : "single-valued") +
+						" to " +   (newLookup.isMultiValued() ? "multi-valued" : "single-valued") +
+						" is not allowed"
+					);
+				}
+
+				if (!isManagedTables() && oldLookup.isMultiValued()) {
+					AbstractLookupControl oldCtrl = (AbstractLookupControl) existingControl;
+					AbstractLookupControl newCtrl = (AbstractLookupControl) control;
+					newCtrl.setCollectionTable(oldCtrl.getCollectionTable());
+				}
+			} else if (existingControl instanceof MultiSelectControl existingMsCtrl) {
 				MultiSelectControl newMsCtrl = (MultiSelectControl)control;
 				if (!isManagedTables()) {
 					// 
@@ -1334,6 +1351,10 @@ public class Container implements Serializable {
 
 				createTable(jdbcDao, mCtrl.getTableName(), ctrl.getColumnDefs(), null, false);
 				createMultiSelectIndexes(jdbcDao, mCtrl.getTableName());
+			} else if (ctrl instanceof AbstractLookupControl luCtrl && luCtrl.isMultiValued()) {
+				luCtrl.setCollectionTable(getUniqueTableName());
+				createTable(jdbcDao, luCtrl.getCollectionTable(), luCtrl.getCollectionColumnDefs(), null, false);
+				createMultiSelectIndexes(jdbcDao, luCtrl.getCollectionTable());
 			} else if (ctrl instanceof SubFormControl) {
 				SubFormControl sfCtrl = (SubFormControl)ctrl;
 				sfCtrl.getSubContainer().executeDDL(jdbcDao, dbTableName);
@@ -1394,7 +1415,7 @@ public class Container implements Serializable {
 	private void createMultiSelectIndexes(JdbcDao jdbcDao, String tableName) {
 		jdbcDao.executeDDL(String.format(CREATE_MS_UNIQUE_IDX_DDL, tableName, tableName));
 	}
-	
+
 	private void addTableColumns(JdbcDao jdbcDao, String tableName, List<ColumnDef> columnDefs) {
 		if (columnDefs == null || columnDefs.isEmpty()) {
 			return;
@@ -1864,14 +1885,14 @@ public class Container implements Serializable {
 	private boolean isMultiValued(Control ctrl) {
 		if (ctrl instanceof MultiSelectControl) {
 			return true;
-		}
-		
-		if (ctrl instanceof SubFormControl) {
+		} else if (ctrl instanceof LookupControl luCtrl) {
+			return luCtrl.isMultiValued();
+		} else if (ctrl instanceof SubFormControl) {
 			SubFormControl sfCtrl = (SubFormControl)ctrl;
 			return !sfCtrl.isOneToOne();
+		} else {
+			return false;
 		}
-		
-		return false;
 	}
 	
 	private boolean isOneToOneNonInverse(Control ctrl) {

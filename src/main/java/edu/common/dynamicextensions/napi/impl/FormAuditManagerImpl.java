@@ -28,6 +28,7 @@ import edu.common.dynamicextensions.domain.nui.Container;
 import edu.common.dynamicextensions.domain.nui.Control;
 import edu.common.dynamicextensions.domain.nui.FileUploadControl;
 import edu.common.dynamicextensions.domain.nui.Label;
+import edu.common.dynamicextensions.domain.nui.LookupControl;
 import edu.common.dynamicextensions.domain.nui.MultiSelectControl;
 import edu.common.dynamicextensions.domain.nui.PageBreak;
 import edu.common.dynamicextensions.domain.nui.SubFormControl;
@@ -151,7 +152,7 @@ public class FormAuditManagerImpl implements FormAuditManager {
 					!Objects.equals(prevFcv.getFileId(), currFcv.getFileId()) ||
 					!Objects.equals(prevFcv.getFilename(), currFcv.getFilename())
 				);
-		} else if (prevValue.getControl() instanceof MultiSelectControl) {
+		} else if (isMultiValued(prevValue.getControl())) {
 			return !arrayEquals((Object[]) prevValue.getValue(), (Object[]) currValue.getValue());
 		} else {
 			return !valueEquals(prevValue.getValue(), currValue.getControl().toString(currValue.getValue()));
@@ -338,13 +339,20 @@ public class FormAuditManagerImpl implements FormAuditManager {
 
 				field.put("subRecords", subRecords);
 			} else {
-				if (ctrl instanceof MultiSelectControl) {
-					MultiSelectControl msCtrl = (MultiSelectControl) ctrl;
+				LookupControl luCtrl = ctrl instanceof LookupControl ? (LookupControl) ctrl : null;
+				if (isMultiValued(ctrl)) {
 					field.put("multiple", true);
-					field.put("dbTable", msCtrl.getTableName());
+					if (luCtrl != null) {
+						field.put("dbTable", luCtrl.getCollectionTable());
+						field.put("dbColumn", luCtrl.getCollectionValueColumn());
+					} else {
+						field.put("dbTable", ((MultiSelectControl) ctrl).getTableName());
+						field.put("dbColumn", ctrl.getDbColumnName());
+					}
+				} else {
+					field.put("dbColumn", ctrl.getDbColumnName());
 				}
 
-				field.put("dbColumn", ctrl.getDbColumnName());
 				field.put("value", val);
 			}
 
@@ -353,6 +361,10 @@ public class FormAuditManagerImpl implements FormAuditManager {
 
 		result.put("fields", fieldProps);
 		return result;
+	}
+
+	private boolean isMultiValued(Control ctrl) {
+		return ctrl instanceof MultiSelectControl || (ctrl instanceof LookupControl luCtrl && luCtrl.isMultiValued());
 	}
 
 	private void persist(FormAuditEvent formAuditEvent, JdbcDao jdbcDao) {

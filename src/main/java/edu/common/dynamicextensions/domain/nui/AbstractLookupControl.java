@@ -1,23 +1,34 @@
 package edu.common.dynamicextensions.domain.nui;
 
-import static edu.common.dynamicextensions.nutility.XmlUtil.writeElementEnd;
-import static edu.common.dynamicextensions.nutility.XmlUtil.writeElementStart;
-
 import java.io.Writer;
 import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
+import java.util.stream.Collectors;
+
+import org.apache.commons.lang3.StringUtils;
 
 import edu.common.dynamicextensions.ndao.ColumnTypeHelper;
 import edu.common.dynamicextensions.ndao.JdbcDaoFactory;
 import edu.common.dynamicextensions.ndao.ResultExtractor;
+import edu.common.dynamicextensions.nutility.XmlUtil;
+
+import static edu.common.dynamicextensions.nutility.XmlUtil.writeElementEnd;
+import static edu.common.dynamicextensions.nutility.XmlUtil.writeElementStart;
 
 public abstract class AbstractLookupControl extends Control implements LookupControl {
 	private static final long serialVersionUID = 1L;
+
+	private static final String COLLECTION_VALUE_COLUMN = "VALUE";
 	
 	private static final String LU_KEY_COLUMN = "IDENTIFIER";
 	
@@ -31,9 +42,9 @@ public abstract class AbstractLookupControl extends Control implements LookupCon
 
 	private String collectionTable;
 
-	private String collectionKey;
+	private String collectionKey = "RECORD_ID";
 
-	private String parentKey;
+	private String parentKey = "IDENTIFIER";
 	
 	@Override
 	public DataType getDataType() {
@@ -62,7 +73,13 @@ public abstract class AbstractLookupControl extends Control implements LookupCon
 		}
 	}
 
-	public abstract void getProps(Map<String, Object> props);
+	@Override
+	public final void getProps(Map<String, Object> props) {
+		props.put("multiple", isMultiValued());
+		getLookupProps(props);
+	}
+
+	protected abstract void getLookupProps(Map<String, Object> props);
 	
 	public abstract String getTableName();		
 	
@@ -74,7 +91,7 @@ public abstract class AbstractLookupControl extends Control implements LookupCon
 	}
 
 	public void setParentKey(String parentKey) {
-		this.parentKey = parentKey;
+		this.parentKey = StringUtils.defaultIfBlank(parentKey, "IDENTIFIER");
 	}
 
 	@Override
@@ -119,18 +136,67 @@ public abstract class AbstractLookupControl extends Control implements LookupCon
 	}
 
 	public void setCollectionKey(String collectionKey) {
-		this.collectionKey = collectionKey;
+		this.collectionKey = StringUtils.defaultIfBlank(collectionKey, "RECORD_ID");
+	}
+
+	@Override
+	public String getCollectionValueColumn() {
+		return getContainer() != null && getContainer().isManagedTables()
+			? getDbColumnName()
+			: COLLECTION_VALUE_COLUMN;
+	}
+
+	@Override
+	public List<ColumnDef> getCollectionColumnDefs() {
+		List<ColumnDef> columns = new ArrayList<>();
+		ColumnDef valueColumn = ColumnDef.get(getCollectionValueColumn(), ColumnTypeHelper.getIntegerColType() + " NOT NULL");
+		valueColumn.setRefTable(getTableName());
+		valueColumn.setRefColumn(getLookupKey());
+
+		columns.add(valueColumn);
+		columns.add(ColumnDef.get(getCollectionKey(), ColumnTypeHelper.getIntegerColType()));
+		return columns;
 	}
 
 	protected void serializeToXml(String field, Writer writer, Properties props) {
 		writeElementStart(writer, field);
 		super.serializeToXml(writer, props);
+		serializeLookupProps(writer);
 		writeElementEnd(writer, field);						
-	}	
+	}
+
+	protected void serializeLookupProps(Writer writer) {
+		XmlUtil.writeElement(writer, "multiple", multiValued);
+	}
 
 	@Override
 	public ValidationStatus validate(Object value) {
-		boolean empty = value == null || value.toString().trim().isEmpty();
+		if (multiValued) {
+			Collection<?> values;
+			if (value == null) {
+				values = Collections.emptyList();
+			} else if (value instanceof Collection) {
+				values = (Collection<?>) value;
+			} else if (value.getClass().isArray()) {
+				values = Arrays.asList((Object[]) value);
+			} else {
+				return ValidationStatus.INVALID_VALUE;
+			}
+
+			if (isMandatory() && values.stream().allMatch(this::isEmptyValue)) {
+				return ValidationStatus.NULL_OR_EMPTY;
+			}
+
+			for (Object element : new LinkedHashSet<>(values)) {
+				if (!isEmptyValue(element) && !isValid(element)) {
+					return ValidationStatus.INVALID_VALUE;
+				}
+			}
+
+			return ValidationStatus.OK;
+		}
+
+		boolean empty = isEmptyValue(value);
 		if (!empty) {
 			Long id = fromString(value.toString());
 			if (id == null) {
@@ -144,11 +210,7 @@ public abstract class AbstractLookupControl extends Control implements LookupCon
 			return ValidationStatus.NULL_OR_EMPTY;
 		}
 						
-		if (empty) {
-			return ValidationStatus.OK;
-		}
-	
-		if (!isValid(value)) {
+		if (!empty && !isValid(value)) {
 			return ValidationStatus.INVALID_VALUE;
 		}
 		
@@ -166,12 +228,20 @@ public abstract class AbstractLookupControl extends Control implements LookupCon
 			return null;
 		}
 
-		Long id = fromString(value.toString());
-		if (id == null) {
-			return null;
+		if (value instanceof Collection<?> values) {
+			return values.stream()
+				.map(this::toDisplayValue)
+				.filter(Objects::nonNull)
+				.collect(Collectors.joining(", "));
+		} else if (value instanceof Object[] values) {
+			return Arrays.stream(values)
+				.map(this::toDisplayValue)
+				.filter(Objects::nonNull)
+				.collect(Collectors.joining(", "));
 		}
 
-		return getColumnValue(id);
+		Long id = fromString(value.toString());
+		return id != null ? getColumnValue(id) : null;
 	}
 
 	public Object getValue(Object input) {
@@ -185,6 +255,10 @@ public abstract class AbstractLookupControl extends Control implements LookupCon
 		}
 
 		return input;
+	}
+
+	private boolean isEmptyValue(Object value) {
+		return value == null || value.toString().trim().isEmpty() || "-1".equals(value.toString());
 	}
 
 	private boolean isValid(Object value) {
@@ -202,15 +276,20 @@ public abstract class AbstractLookupControl extends Control implements LookupCon
 	
 	private Long getKeyByAltKey(String value) {
 		String query = String.format(GET_KEY_BY_ALT_KEY, getLookupKey(), getTableName(), getAltKeyColumn());
-		return JdbcDaoFactory.getJdbcDao().getResultSet(
+		Long result = JdbcDaoFactory.getJdbcDao().getResultSet(
 				query, 
 				Collections.singletonList(value),
-				new ResultExtractor<Long>() {
-					@Override
-					public Long extract(ResultSet rs) throws SQLException {
-						return rs.next() ? rs.getLong(1) : null;						
-					}
-				});
+				rs -> rs.next() ? rs.getLong(1) : null);
+
+		if (result == null && !getAltKeyColumn().equalsIgnoreCase(getValueColumn())) {
+			query = String.format(GET_KEY_BY_ALT_KEY, getLookupKey(), getTableName(), getValueColumn());
+			result = JdbcDaoFactory.getJdbcDao().getResultSet(
+				query,
+				Collections.singletonList(value),
+				rs -> rs.next() ? rs.getLong(1) : null
+			);
+		}
+		return result;
 	}
 
 	private String getColumnValue(Long id) {

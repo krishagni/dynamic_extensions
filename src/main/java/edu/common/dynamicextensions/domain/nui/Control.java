@@ -499,7 +499,7 @@ public abstract class Control implements Comparable<Control>, Serializable {
 		ctrlProps.put("showInGrid", showInGrid());
 		ctrlProps.put("rowColumn", getxPos());
 		ctrlProps.put("pageRow", getSequenceNumber());
-		
+
 		getProps(ctrlProps);
 		return ctrlProps;
 	}

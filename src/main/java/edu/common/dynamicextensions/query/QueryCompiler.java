@@ -328,7 +328,7 @@ public class QueryCompiler {
 				valueTree.setParent(fieldTree);
 				valueTree.setAlias("t" + tabCnt++);
 				valueTree.setTab(luCtrl.getTableName());
-				valueTree.setParentKey(field.getDbColumnName());
+				valueTree.setParentKey(luCtrl.getCollectionValueColumn());
 				valueTree.setForeignKey(luCtrl.getLookupKey());
 				fieldTree.addChild(valueTree.getAlias(), valueTree);
 			} else {

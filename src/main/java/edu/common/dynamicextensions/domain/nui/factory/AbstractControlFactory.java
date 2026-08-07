@@ -120,7 +120,6 @@ public abstract class AbstractControlFactory implements ControlFactory {
 		ctrl.setRecordUrl((String) props.get("recordUrl"));
 		ctrl.setShowWhenExpr((String) props.get("showWhen"));
 		ctrl.setHidden(getBool(props, "hidden", false));
-
 		String dbColumn = (String) props.get("column");
 		if (dbColumn != null && !dbColumn.trim().isEmpty()) {
 			ctrl.setDbColumnName(dbColumn.trim());

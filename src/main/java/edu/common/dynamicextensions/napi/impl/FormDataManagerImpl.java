@@ -54,11 +54,14 @@ import edu.common.dynamicextensions.ndao.ResultExtractor;
 import edu.common.dynamicextensions.nutility.DeConfiguration;
 
 public class FormDataManagerImpl implements FormDataManager {
-	private static final String GET_MULTI_SELECT_VALUES_SQL = "SELECT RECORD_ID, %s FROM %s WHERE %s";
+	private static final String GET_MULTI_SELECT_VALUES_SQL = "SELECT %s, %s FROM %s WHERE %s";
+
+	private static final String GET_MANAGED_MULTI_SELECT_VALUES_SQL =
+		"SELECT p.IDENTIFIER, c.%s FROM %s c INNER JOIN %s p ON p.%s = c.%s WHERE %s";
 	
-	private static final String DELETE_MULTI_SELECT_VALUES_SQL = "DELETE FROM %s WHERE RECORD_ID = ?";
+	private static final String DELETE_MULTI_SELECT_VALUES_SQL = "DELETE FROM %s WHERE %s = ?";
 	
-	private static final String INSERT_MULTI_SELECT_VALUES_SQL = "INSERT INTO %s (RECORD_ID, VALUE) VALUES (?, ?)";
+	private static final String INSERT_MULTI_SELECT_VALUES_SQL = "INSERT INTO %s (%s, %s) VALUES (?, ?)";
 	
 	private static final String GET_SUB_FORM_IDS_SQL = "SELECT IDENTIFIER FROM %s WHERE PARENT_RECORD_ID = ?";
 
@@ -427,10 +430,20 @@ public class FormDataManagerImpl implements FormDataManager {
 
 		for (Control ctrl : multiSelectCtrls) {
 			Map<Long, List<String>> rValuesMap = getMultiSelectValues(jdbcDao, ctrl, formsData.keySet());
-			rValuesMap.forEach((recordId, values) -> {
-				ControlValue cv = new ControlValue(ctrl, values.toArray(new String[0]));
-				formsData.get(recordId).addFieldValue(cv);
-			});
+			rValuesMap.forEach(
+				(recordId, values) -> {
+					ControlValue cv = new ControlValue(ctrl, values.toArray(new String[0]));
+					if (ctrl instanceof LookupControl luCtrl) {
+						String[] displayValues = values.stream().map(ctrl::toDisplayValue).toArray(String[]::new);
+						cv.setUiValue(displayValues);
+						if (luCtrl.getPvSourceProps().getProperty("useDisplayValue", "false").equals("true")) {
+							cv.setValue(displayValues);
+						}
+					}
+
+					formsData.get(recordId).addFieldValue(cv);
+				}
+			);
 		}
 
 		for (Control ctrl : subFormCtrls) {
@@ -566,13 +579,31 @@ public class FormDataManagerImpl implements FormDataManager {
 			return Collections.emptyMap();
 		}
 
-		MultiSelectControl msCtrl = (MultiSelectControl)ctrl;
+		String collectionKey = getCollectionKey(ctrl);
+		String parentKey = getCollectionParentKey(ctrl);
+		String query;
+		if (parentKey.equalsIgnoreCase("IDENTIFIER")) {
+			query = String.format(
+				GET_MULTI_SELECT_VALUES_SQL,
+				collectionKey,
+				getCollectionValueColumn(ctrl),
+				getCollectionTable(ctrl),
+				getInClause(collectionKey, recordIds.size()));
+		} else {
+			query = String.format(
+				GET_MANAGED_MULTI_SELECT_VALUES_SQL,
+				getCollectionValueColumn(ctrl),
+				getCollectionTable(ctrl),
+				ctrl.getContainer().getDbTableName(),
+				parentKey,
+				collectionKey,
+				getInClause("p.IDENTIFIER", recordIds.size()));
+		}
 
-		String inClause = getInClause("RECORD_ID", recordIds.size());
-		String query = String.format(GET_MULTI_SELECT_VALUES_SQL, ctrl.getDbColumnName(), msCtrl.getTableName(), inClause);
-		return jdbcDao.getResultSet(query, new ArrayList<>(recordIds), new ResultExtractor<Map<Long, List<String>>>() {
-			@Override
-			public Map<Long, List<String>> extract(ResultSet rs) throws SQLException {
+		return jdbcDao.getResultSet(
+			query,
+			new ArrayList<>(recordIds),
+			rs -> {
 				Map<Long, List<String>> results = new HashMap<>();
 				while (rs.next()) {
 					int idx = 0;
@@ -581,14 +612,14 @@ public class FormDataManagerImpl implements FormDataManager {
 
 					List<String> values = results.computeIfAbsent(recordId, (u) -> new ArrayList<>());
 					String valueStr = ctrl.toString(value);
-					if (values.indexOf(valueStr) == -1) {
+					if (!values.contains(valueStr)) {
 						values.add(valueStr);
 					}
 				}
-				
+
 				return results;
 			}
-		});
+		);
 	}
 
 	private String getInClause(String columnName, int numValues) {
@@ -599,7 +630,7 @@ public class FormDataManagerImpl implements FormDataManager {
 			}
 
 			inClause.append(columnName).append(" IN (");
-			int numPlaceholders = (numValues - i * 500) > 500 ? 500 : (numValues - i * 500);
+			int numPlaceholders = Math.min((numValues - i * 500), 500);
 			for (int j = 0; j < numPlaceholders; ++j) {
 				inClause.append("?, ");
 			}
@@ -607,7 +638,7 @@ public class FormDataManagerImpl implements FormDataManager {
 			inClause.delete(inClause.length() - 2, inClause.length()).append(")");
 		}
 
-		return "(" + inClause.toString() + ")";
+		return "(" + inClause + ")";
 	}
 	
 	private Long saveOrUpdateFormData(JdbcDao jdbcDao, FormData formData, Long parentRecId, List<FileControlValue> files)
@@ -697,7 +728,10 @@ public class FormDataManagerImpl implements FormDataManager {
 
 			for (Control msCtrl : multiSelectCtrls) {
 				ControlValue ctrlValue = formData.getFieldValue(msCtrl.getName());
-				updateMultiSelectValues(jdbcDao, ctrlValue, recordId);
+				if (ctrlValue != null) {
+					Object parentValue = getCollectionParentValue(jdbcDao, msCtrl, recordId);
+					updateMultiSelectValues(jdbcDao, ctrlValue, parentValue);
+				}
 			}
 
 			for (Control sfCtrl : subFormCtrls) {
@@ -842,18 +876,17 @@ public class FormDataManagerImpl implements FormDataManager {
 		return updateSql.toString();
 	}
 	
-	private void updateMultiSelectValues(JdbcDao jdbcDao, ControlValue msCtrlValue, Long recordId) 
-	throws Exception {
+	private void updateMultiSelectValues(JdbcDao jdbcDao, ControlValue msCtrlValue, Object parentValue) {
 		String[] strValues =  msCtrlValue != null ? (String[]) msCtrlValue.getValue() : null;
-		MultiSelectControl msCtrl = msCtrlValue != null ? (MultiSelectControl)msCtrlValue.getControl() : null;
-			
+		Control msCtrl = msCtrlValue != null ? msCtrlValue.getControl() : null;
+
 		if (msCtrl != null) {
-			String deleteSql = String.format(DELETE_MULTI_SELECT_VALUES_SQL, msCtrl.getTableName());		
-			jdbcDao.executeUpdate(deleteSql, Collections.singletonList(recordId));
+			String deleteSql = String.format(DELETE_MULTI_SELECT_VALUES_SQL, getCollectionTable(msCtrl), getCollectionKey(msCtrl));
+			jdbcDao.executeUpdate(deleteSql, Collections.singletonList(parentValue));
 		}
 		
 		if (strValues != null) {
-			String insertSql = String.format(INSERT_MULTI_SELECT_VALUES_SQL, msCtrl.getTableName());
+			String insertSql = String.format(INSERT_MULTI_SELECT_VALUES_SQL, getCollectionTable(msCtrl), getCollectionKey(msCtrl), getCollectionValueColumn(msCtrl));
 
 			List<Object> params = new ArrayList<>();
 			for (String strValue : new LinkedHashSet<>(Arrays.asList(strValues))) {
@@ -862,9 +895,12 @@ public class FormDataManagerImpl implements FormDataManager {
 				}
 
 				Object value = msCtrl.fromString(strValue);
-				
+				if (value == null) {
+					throw new FormException("Invalid value '" + strValue + "' for field: " + msCtrl.getCaption());
+				}
+
 				params.clear();
-				params.add(recordId);				
+				params.add(parentValue);
 				params.add(value);				
 				jdbcDao.executeUpdate(insertSql, params);				
 			}
@@ -880,8 +916,8 @@ public class FormDataManagerImpl implements FormDataManager {
 		for (Control ctrl : container.getControlsMap().values()) {
 			if (ctrl instanceof SubFormControl) {
 				subFormCtrls.add(ctrl);
-			} else if (ctrl instanceof MultiSelectControl) {
-				multiSelectCtrls.add(ctrl); 
+			} else if (isMultiValued(ctrl)) {
+				multiSelectCtrls.add(ctrl);
 			} else if (!(ctrl instanceof Label || ctrl instanceof PageBreak)) {
 				simpleCtrls.add(ctrl);
 			}
@@ -965,7 +1001,7 @@ public class FormDataManagerImpl implements FormDataManager {
 	}
 	
 	private boolean isGridControl(Control ctrl) {
-		if (ctrl instanceof MultiSelectControl || ctrl instanceof SubFormControl) {
+		if (isMultiValued(ctrl) || ctrl instanceof SubFormControl) {
 			return false;
 		}
 		
@@ -1075,9 +1111,9 @@ public class FormDataManagerImpl implements FormDataManager {
 			.append(sfField ? "pf.parent_record_id" : "pf.identifier")
 			.append(" from ").append(ctrl.getContainer().getDbTableName()).append(" pf ");
 
-		if (ctrl instanceof MultiSelectControl) {
-			MultiSelectControl msCtrl = (MultiSelectControl) ctrl;
-			sql.append(" inner join ").append(msCtrl.getTableName()).append(" ms on ms.record_id = pf.identifier");
+		if (isMultiValued(ctrl)) {
+			sql.append(" inner join ").append(getCollectionTable(ctrl)).append(" ms ")
+				.append(" on ms.").append(getCollectionKey(ctrl)).append(" = pf.").append(getCollectionParentKey(ctrl));
 			valueTabAlias = "ms";
 		}
 
@@ -1086,7 +1122,7 @@ public class FormDataManagerImpl implements FormDataManager {
 			sql.append(" inner join ").append(joinSql);
 		}
 
-		String valueColumnName = ctrl.getDbColumnName();
+		String valueColumnName = isMultiValued(ctrl) ? getCollectionValueColumn(ctrl) : ctrl.getDbColumnName();
 		Object valueObj = value instanceof String ? ctrl.fromString((String)value) : value;
 		if (ctrl instanceof FileUploadControl) {
 			valueColumnName += "_NAME";
@@ -1104,6 +1140,55 @@ public class FormDataManagerImpl implements FormDataManager {
 				return recordIds;
 			}
 		);
+	}
+
+	private boolean isMultiValued(Control ctrl) {
+		return ctrl instanceof MultiSelectControl || (ctrl instanceof LookupControl luCtrl && luCtrl.isMultiValued());
+	}
+
+	private String getCollectionTable(Control ctrl) {
+		return ctrl instanceof MultiSelectControl
+			? ((MultiSelectControl) ctrl).getTableName()
+			: ((LookupControl) ctrl).getCollectionTable();
+	}
+
+	private String getCollectionKey(Control ctrl) {
+		return ctrl instanceof MultiSelectControl
+			? ((MultiSelectControl) ctrl).getForeignKey()
+			: ((LookupControl) ctrl).getCollectionKey();
+	}
+
+	private String getCollectionParentKey(Control ctrl) {
+		String parentKey = ctrl instanceof MultiSelectControl
+			? ((MultiSelectControl) ctrl).getParentKey()
+			: ((LookupControl) ctrl).getParentKey();
+		return StringUtils.defaultIfBlank(parentKey, "IDENTIFIER");
+	}
+
+	private Object getCollectionParentValue(JdbcDao jdbcDao, Control ctrl, Long recordId) {
+		String parentKey = getCollectionParentKey(ctrl);
+		if (parentKey.equalsIgnoreCase("IDENTIFIER")) {
+			return recordId;
+		}
+
+		String sql = "SELECT " + parentKey + " FROM " + ctrl.getContainer().getDbTableName() + " WHERE IDENTIFIER = ?";
+		Object parentValue = jdbcDao.getResultSet(
+			sql,
+			Collections.singletonList(recordId),
+			rs -> rs.next() ? rs.getObject(1) : null
+		);
+
+		if (parentValue == null) {
+			throw new FormException("Null parent key '" + parentKey + "' for record " + recordId + " and field: " + ctrl.getCaption());
+		}
+
+		return parentValue;
+	}
+
+	private String getCollectionValueColumn(Control ctrl) {
+		return ctrl instanceof MultiSelectControl
+			? ctrl.getDbColumnName()
+			: ((LookupControl) ctrl).getCollectionValueColumn();
 	}
 
 	private boolean isValidRecord(final JdbcDao jdbcDao, Container form, Object value) {
