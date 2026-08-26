@@ -303,6 +303,13 @@ public interface AQLVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitRoundFunc(AQLParser.RoundFuncContext ctx);
 	/**
+	 * Visit a parse tree produced by the {@code CurrentTimestampFunc}
+	 * labeled alternative in {@link AQLParser#arith_expr}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitCurrentTimestampFunc(AQLParser.CurrentTimestampFuncContext ctx);
+	/**
 	 * Visit a parse tree produced by the {@code DateIntervalExpr}
 	 * labeled alternative in {@link AQLParser#arith_expr}.
 	 * @param ctx the parse tree

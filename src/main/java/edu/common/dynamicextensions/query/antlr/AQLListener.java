@@ -508,6 +508,18 @@ public interface AQLListener extends ParseTreeListener {
 	 */
 	void exitRoundFunc(AQLParser.RoundFuncContext ctx);
 	/**
+	 * Enter a parse tree produced by the {@code CurrentTimestampFunc}
+	 * labeled alternative in {@link AQLParser#arith_expr}.
+	 * @param ctx the parse tree
+	 */
+	void enterCurrentTimestampFunc(AQLParser.CurrentTimestampFuncContext ctx);
+	/**
+	 * Exit a parse tree produced by the {@code CurrentTimestampFunc}
+	 * labeled alternative in {@link AQLParser#arith_expr}.
+	 * @param ctx the parse tree
+	 */
+	void exitCurrentTimestampFunc(AQLParser.CurrentTimestampFuncContext ctx);
+	/**
 	 * Enter a parse tree produced by the {@code DateIntervalExpr}
 	 * labeled alternative in {@link AQLParser#arith_expr}.
 	 * @param ctx the parse tree

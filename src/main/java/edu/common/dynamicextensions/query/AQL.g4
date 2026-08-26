@@ -78,6 +78,7 @@ arith_expr    : arith_expr ARITH_OP arith_expr               #ArithExpr
               | YRS_BTWN LP arith_expr ',' arith_expr RP     #YearsDiffFunc
               | MINS_BTWN LP arith_expr ',' arith_expr RP    #MinsDiffFunc
               | CURR_DATE LP RP                              #CurrentDateFunc
+              | CURR_TIMESTAMP LP RP                         #CurrentTimestampFunc
               | agg_expr                                     #AggExpr
               | concat_expr                                  #ConcatExpr
               | concat_ws_expr                               #ConcatWsExpr
@@ -114,6 +115,7 @@ DATE_FMT : 'date_format';
 MTHS_BTWN: 'months_between';
 YRS_BTWN:  'years_between';
 CURR_DATE: 'current_date';
+CURR_TIMESTAMP: 'current_timestamp';
 MINS_BTWN: 'minutes_between';
 DATE_RANGE: 'date_range';
 COUNT    : 'count';

@@ -521,6 +521,18 @@ public class AQLBaseListener implements AQLListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
+	@Override public void enterCurrentTimestampFunc(AQLParser.CurrentTimestampFuncContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitCurrentTimestampFunc(AQLParser.CurrentTimestampFuncContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
 	@Override public void enterDateIntervalExpr(AQLParser.DateIntervalExprContext ctx) { }
 	/**
 	 * {@inheritDoc}

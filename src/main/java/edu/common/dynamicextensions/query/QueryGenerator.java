@@ -32,6 +32,7 @@ import edu.common.dynamicextensions.query.ast.ArithExpressionNode.ArithOp;
 import edu.common.dynamicextensions.query.ast.BetweenNode;
 import edu.common.dynamicextensions.query.ast.ConcatNode;
 import edu.common.dynamicextensions.query.ast.CurrentDateNode;
+import edu.common.dynamicextensions.query.ast.CurrentTimestampNode;
 import edu.common.dynamicextensions.query.ast.DateDiffFuncNode;
 import edu.common.dynamicextensions.query.ast.DateDiffFuncNode.DiffType;
 import edu.common.dynamicextensions.query.ast.DateFormatFuncNode;
@@ -860,6 +861,8 @@ public class QueryGenerator {
 			result = getDateRangeFuncNodeSql((DateRangeFuncNode) exprNode);
     	} else if (exprNode instanceof CurrentDateNode) {
     		result = getCurrentDateSql();
+		} else if (exprNode instanceof CurrentTimestampNode) {
+			result = getCurrentTimestampSql();
     	} else if (exprNode instanceof AggregateNode) {
 			result = getAggregateSql((AggregateNode) exprNode);
 		} else if (exprNode instanceof ConcatNode) {
@@ -1219,12 +1222,20 @@ public class QueryGenerator {
 	}
 
     private String getCurrentDateSql() {
-    	if (DbSettingsFactory.getProduct().equals("Oracle")) {
+    	if (DbSettingsFactory.isOracle()) {
     		return "sysdate";
-    	} else if (DbSettingsFactory.getProduct().equals("MySQL")) {
+    	} else if (DbSettingsFactory.isMySQL()) {
     		return "current_date()";
     	}
     	
+    	throw new FormException("Unknown product type: " + DbSettingsFactory.getProduct());
+    }
+
+    private String getCurrentTimestampSql() {
+		if (DbSettingsFactory.isOracle() || DbSettingsFactory.isMySQL()) {
+			return "current_timestamp";
+		}
+
     	throw new FormException("Unknown product type: " + DbSettingsFactory.getProduct());
     }
     

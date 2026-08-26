@@ -312,6 +312,13 @@ public class AQLBaseVisitor<T> extends AbstractParseTreeVisitor<T> implements AQ
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
+	@Override public T visitCurrentTimestampFunc(AQLParser.CurrentTimestampFuncContext ctx) { return visitChildren(ctx); }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation returns the result of calling
+	 * {@link #visitChildren} on {@code ctx}.</p>
+	 */
 	@Override public T visitDateIntervalExpr(AQLParser.DateIntervalExprContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}

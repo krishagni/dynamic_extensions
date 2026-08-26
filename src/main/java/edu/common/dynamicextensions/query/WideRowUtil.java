@@ -5,6 +5,7 @@ import edu.common.dynamicextensions.query.ast.AggregateNode;
 import edu.common.dynamicextensions.query.ast.ArithExpressionNode;
 import edu.common.dynamicextensions.query.ast.ConcatNode;
 import edu.common.dynamicextensions.query.ast.CurrentDateNode;
+import edu.common.dynamicextensions.query.ast.CurrentTimestampNode;
 import edu.common.dynamicextensions.query.ast.DateDiffFuncNode;
 import edu.common.dynamicextensions.query.ast.DateFormatFuncNode;
 import edu.common.dynamicextensions.query.ast.DateIntervalNode;
@@ -21,7 +22,8 @@ public class WideRowUtil {
     	if (exprNode instanceof LiteralValueNode || 
     		exprNode instanceof LiteralValueListNode ||	
     		exprNode instanceof DateIntervalNode ||
-    		exprNode instanceof CurrentDateNode) {
+			exprNode instanceof CurrentDateNode ||
+			exprNode instanceof CurrentTimestampNode) {
     		return null;
     	} else if (exprNode instanceof FieldNode) {
 			FieldNode fieldNode = (FieldNode) exprNode;

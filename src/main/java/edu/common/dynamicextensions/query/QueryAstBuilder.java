@@ -22,6 +22,7 @@ import edu.common.dynamicextensions.query.ast.BetweenNode;
 import edu.common.dynamicextensions.query.ast.ConcatNode;
 import edu.common.dynamicextensions.query.ast.CrosstabNode;
 import edu.common.dynamicextensions.query.ast.CurrentDateNode;
+import edu.common.dynamicextensions.query.ast.CurrentTimestampNode;
 import edu.common.dynamicextensions.query.ast.DateDiffFuncNode;
 import edu.common.dynamicextensions.query.ast.DateDiffFuncNode.DiffType;
 import edu.common.dynamicextensions.query.ast.DateFormatFuncNode;
@@ -478,6 +479,11 @@ public class QueryAstBuilder extends AQLBaseVisitor<Node> {
     @Override
     public CurrentDateNode visitCurrentDateFunc(AQLParser.CurrentDateFuncContext ctx) {
     	return setAql(new CurrentDateNode(), ctx);
+    }
+
+    @Override
+    public CurrentTimestampNode visitCurrentTimestampFunc(AQLParser.CurrentTimestampFuncContext ctx) {
+		return setAql(new CurrentTimestampNode(), ctx);
     }
     
     @Override
