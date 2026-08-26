@@ -68,6 +68,8 @@ public class Container implements Serializable {
 	private static final String CREATE_MS_UNIQUE_IDX_DDL = "create unique index %s_UQ on %s(RECORD_ID, VALUE)";
 
 	private static final String ADD_FK = "alter table %s add constraint %s foreign key (%s) references %s(%s)";
+
+	private static final ThreadLocal<Boolean> selectToLookupConversion = ThreadLocal.withInitial(() -> false);
 			
 	private Long id;
 	
@@ -668,9 +670,11 @@ public class Container implements Serializable {
 
 				add(delLog, existingControl);
 				add(addLog, control);
-			} else if ((existingControl instanceof RadioButton && (control instanceof StringTextField || control instanceof ComboBox)) ||
+			} else if (
+				(existingControl instanceof RadioButton && (control instanceof StringTextField || control instanceof ComboBox)) ||
 				(existingControl instanceof ComboBox && (control instanceof StringTextField || control instanceof RadioButton)) ||
-				(existingControl instanceof MultiSelectControl && control instanceof MultiSelectControl)) {
+				(existingControl instanceof MultiSelectControl && control instanceof MultiSelectControl) ||
+				isSelectToLookupConversion(existingControl, control)) {
 
 				//
 				// only following change is allowed:
@@ -684,10 +688,12 @@ public class Container implements Serializable {
 				control.setDbColumnName(existingControl.getDbColumnName());
 				control.setContainer(this);
 
-				if (existingControl instanceof MultiSelectControl) {
-					MultiSelectControl existingMsCtrl = (MultiSelectControl)existingControl;
-					MultiSelectControl newMsCtrl = (MultiSelectControl)control;
-					newMsCtrl.setTableName(existingMsCtrl.getTableName());
+				if (existingControl instanceof MultiSelectControl existingMsCtrl) {
+					if (control instanceof MultiSelectControl newMsCtrl) {
+						newMsCtrl.setTableName(existingMsCtrl.getTableName());
+					} else if (control instanceof AbstractLookupControl newLookupCtrl) {
+						newLookupCtrl.setCollectionTable(existingMsCtrl.getTableName());
+					}
 				}
 
 				add(editLog, control);
@@ -774,7 +780,7 @@ public class Container implements Serializable {
 		userDefCtrlNames.add(control.getUserDefinedName());
 		return diff;
 	}
-	
+
 	public void deleteControl(String name) {
 		throwExceptionIfDto();
 		
@@ -1237,6 +1243,14 @@ public class Container implements Serializable {
 		return diff;
 	}
 
+	public static void enableSelectToLookupConversion() {
+		selectToLookupConversion.set(true);
+	}
+
+	public static void disableSelectToLookupConversion() {
+		selectToLookupConversion.remove();
+	}
+
 	protected List<String> deleteRemovedControls(Container newContainer) {
 		Collection<Control> existingCtrls = getControls();
 		Collection<Control> removedCtrls = new ArrayList<Control>();
@@ -1512,7 +1526,16 @@ public class Container implements Serializable {
 			throw new FormException("Error querying database", e);
 		}
 	}
-	
+
+	private boolean isSelectToLookupConversion(Control existingControl, Control control) {
+		if (!selectToLookupConversion.get() || !(control instanceof LookupControl lookup)) {
+			return false;
+		}
+
+		return ((existingControl instanceof ComboBox || existingControl instanceof RadioButton) && !lookup.isMultiValued()) ||
+			(existingControl instanceof MultiSelectControl && lookup.isMultiValued());
+	}
+
 	protected void clearLogs() {
 		addLog.clear();
 		editLog.clear();
