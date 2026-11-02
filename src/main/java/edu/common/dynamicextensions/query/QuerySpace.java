@@ -100,7 +100,11 @@ public class QuerySpace {
 			XmlUtil.writeElementEnd(writer, "view");
 			XmlUtil.writeElementEnd(writer, "form");
 
-			return new ContainerParser(new ByteArrayInputStream(writer.toString().getBytes())).parse();
+			//
+			// Query-space forms and their tables are managed by the host application. The host application
+			// is responsible for ensuring that the user is authorised to create custom query spaces.
+			//
+			return new ContainerParser(new ByteArrayInputStream(writer.toString().getBytes()), true).parse();
 		} catch (Exception e) {
 			throw new FormException("Error creating form: " + e.getMessage(), e);
 		}

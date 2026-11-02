@@ -18,6 +18,8 @@ public class ContainerPropsParser {
 	}
 
 	public Container parse() {
+		FormDefinitionValidator.validateUserForm(props);
+
 		Container container = new Container();
 
 		container.useAsDto();
@@ -64,4 +66,5 @@ public class ContainerPropsParser {
 
 		return container;
 	}
+
 }

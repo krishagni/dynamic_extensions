@@ -37,26 +37,39 @@ import edu.common.dynamicextensions.domain.nui.factory.ControlManager;
 import edu.common.dynamicextensions.napi.FormException;
 
 public class ContainerParser {
-
 	private final String formXml;
+
+	private final boolean managedForm;
 	
 	private Properties props = new Properties();
 	
 	private InputStream formXmlIn;
 
 	public ContainerParser(String pvDir) {
-		this(null, pvDir);
+		this(null, pvDir, false);
 	}
 	
 	public ContainerParser(String formXml, String pvDir) {
+		this(formXml, pvDir, false);
+	}
+
+	public ContainerParser(String formXml, String pvDir, boolean managedForm) {
 		this.formXml = formXml;
+		this.managedForm = managedForm;
 		props.setProperty("pvDir", pvDir);		
+		props.setProperty("managedForm", Boolean.toString(managedForm));
 	}
 	
 	public ContainerParser(InputStream in) {
+		this(in, false);
+	}
+
+	public ContainerParser(InputStream in, boolean managedForm) {
 		this.formXmlIn = in;
 		this.formXml = null;
+		this.managedForm = managedForm;
 		props.setProperty("pvDir", "");
+		props.setProperty("managedForm", Boolean.toString(managedForm));
 	}
 		
 	public Container parse() throws Exception {
@@ -136,6 +149,10 @@ public class ContainerParser {
 	}
 
 	public Container parse(Element viewElement, boolean topLevel) {
+		if (!managedForm) {
+			FormDefinitionValidator.validateUserForm(viewElement);
+		}
+
 		Container container = new Container();
 		int currentRow = 0;
 		
@@ -167,7 +184,7 @@ public class ContainerParser {
 		
 		return container;
 	}
-	
+
 	private void updateCalculatedSourceControls(Container container, Container rootContainer) {
 		FormulaParser formulaParser = new FormulaParser();
 		for (Control control : container.getControls()) {

@@ -1093,14 +1093,14 @@ public class Container implements Serializable {
 	
 	public static Long createContainer(UserContext ctxt, String formXml, String pvDir, boolean createTables)
 	throws Exception {
-		ContainerParser parser = new ContainerParser(formXml, pvDir);
+		ContainerParser parser = new ContainerParser(formXml, pvDir, !createTables);
 		Container parsedContainer = parser.parse();
 		return createContainer(ctxt, parsedContainer, createTables);
 	}
 	
 	public static Long createContainer(UserContext ctxt, InputStream in, boolean createTables) 
 	throws Exception {
-		ContainerParser parser = new ContainerParser(in);
+		ContainerParser parser = new ContainerParser(in, !createTables);
 		Container parsedContainer = parser.parse();
 		return createContainer(ctxt, parsedContainer, createTables);
 	}
