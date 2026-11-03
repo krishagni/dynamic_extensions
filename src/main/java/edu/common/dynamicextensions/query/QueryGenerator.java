@@ -1046,7 +1046,7 @@ public class QueryGenerator {
 
 	private String getDbDateFormatString(String inputFormat, Map<String, String> dbFormats) {
 		Matcher matcher = DATE_FMT_PATTERN.matcher(inputFormat);
-		StringBuilder result = new StringBuilder("'");
+		StringBuilder result = new StringBuilder();
 		int lastIdx = 0;
 
 		while (matcher.find()) {
@@ -1059,7 +1059,12 @@ public class QueryGenerator {
 			lastIdx = matcher.end();
 		}
 
-		return result.append(inputFormat.substring(lastIdx)).append("'").toString();
+		result.append(inputFormat.substring(lastIdx));
+		return toSqlStringLiteral(result.toString());
+	}
+
+	private String toSqlStringLiteral(String value) {
+		return "'" + escapeSql(value, false) + "'";
 	}
 
     private String getDateDiffFuncNodeSql(DateDiffFuncNode dateDiff) {    	
