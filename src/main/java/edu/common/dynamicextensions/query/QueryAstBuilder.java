@@ -209,7 +209,7 @@ public class QueryAstBuilder extends AQLBaseVisitor<Node> {
     	LiteralValueListNode list = (LiteralValueListNode)visit(ctx.literal_values());
     	int numLiterals = list.size();
     	List<FilterNodeMarker> filters = new ArrayList<>();
-    	int literalsLimit = 995;
+		int literalsLimit = 1000;
 
     	for (int i = 0; i < numLiterals; i += literalsLimit) {
     		List<LiteralValueNode> literals = list.getLiteralVals()

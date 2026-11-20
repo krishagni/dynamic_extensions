@@ -1,9 +1,12 @@
 package edu.common.dynamicextensions.query;
 
 import java.sql.ResultSet;
+import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import javax.sql.DataSource;
@@ -24,6 +27,10 @@ public class Query {
     private JoinTree queryJoinTree;
 
 	private QueryExpressionNode queryExpr;
+
+	private List<QueryTransformer> transformers = Collections.emptyList();
+
+	private WideRowGeneratorFactory wideRowGeneratorFactory = new ShallowWideRowGeneratorFactory();
 
 	private WideRowMode wideRowMode;
     
@@ -68,7 +75,17 @@ public class Query {
         this.wideRowMode = mode;
         return this;
     }
-    
+
+	public Query transformers(List<QueryTransformer> transformers) {
+		this.transformers = transformers != null ? new ArrayList<>(transformers) : Collections.emptyList();
+		return this;
+	}
+
+	public Query wideRowGeneratorFactory(WideRowGeneratorFactory wideRowGeneratorFactory) {
+		this.wideRowGeneratorFactory = Objects.requireNonNull(wideRowGeneratorFactory);
+		return this;
+	}
+
     public Query ic(boolean ic) {
     	this.ic = ic;
     	return this;
@@ -149,7 +166,11 @@ public class Query {
     
     public void compile(String rootFormName, String query, String restriction) {
         QueryCompiler compiler = new QueryCompiler(qs != null ? qs.getRootForm() : rootFormName, query, restriction);
-        compiler.enabledVersionedForms(vcEnabled).pathConfig(pathConfig).querySpace(qs).compile();
+		compiler.enabledVersionedForms(vcEnabled)
+			.pathConfig(pathConfig)
+			.querySpace(qs)
+			.transformers(transformers)
+			.compile();
 
 	    aql           = query;
         queryExpr     = compiler.getQueryExpr();
@@ -194,6 +215,21 @@ public class Query {
         return queryExpr != null && queryExpr.hasResultPostProc() ? queryExpr.getResultPostProcName() : null;
     }
 
+	public boolean isWideRowSupportEnabled() {
+		return
+			(wideRowMode != WideRowMode.OFF) &&
+			!queryExpr.isAggregateQuery() &&
+			!queryExpr.hasResultPostProc();
+	}
+
+	public boolean hasLimit() {
+		return queryExpr != null && queryExpr.getLimitExpr() != null;
+	}
+
+	public int getLimitNumRecords() {
+		return hasLimit() ? queryExpr.getLimitExpr().getNumRecords() : 0;
+	}
+
     public long getCount() {
 		return getCount(dataSource);
 	}
@@ -228,49 +264,61 @@ public class Query {
 
 	public QueryResponse getData(int start, int numRows, DataSource dataSource) {
     	final boolean wideRowSupport = isWideRowSupportEnabled();
-		final String sql = getDataSql(wideRowSupport, start, numRows);
-        final String dataSql = assessSqlRisk(sql, dataSource);
-        final long t1 = System.currentTimeMillis();
+		final ShallowWideRowGenerator wideRowGenerator = wideRowSupport
+			? wideRowGeneratorFactory.create(queryJoinTree, queryExpr, wideRowMode)
+			: null;
+		boolean cleanupWideRowGenerator = wideRowGenerator != null;
+		try {
+			final String sql = getDataSql(wideRowSupport, start, numRows, wideRowGenerator);
+			final String dataSql = assessSqlRisk(sql, dataSource);
+			final long t1 = System.currentTimeMillis();
 
-		JdbcDao jdbcDao = JdbcDaoFactory.getJdbcDao(dataSource);
-		jdbcDao.setQueryTimeout(timeoutInSeconds);
-		jdbcDao.setFetchSize(Integer.MIN_VALUE);
+			JdbcDao jdbcDao = JdbcDaoFactory.getJdbcDao(dataSource);
+			jdbcDao.setQueryTimeout(timeoutInSeconds);
+			jdbcDao.setFetchSize(Integer.MIN_VALUE);
 
-        return jdbcDao.getResultSet(dataSql, null, rs -> {
-	        long t2 = System.currentTimeMillis();
-	        QueryResultData resultData = null;
-	        boolean cleanupResultData = true;
+			QueryResponse response = jdbcDao.getResultSet(dataSql, null, rs -> {
+				long t2 = System.currentTimeMillis();
+				QueryResultData resultData = null;
+				boolean cleanupResultData = true;
 
-			try {
-				if (wideRowSupport) {
-					resultData = getWideRowData(rs);
-				} else if (resultPostProc != null) {
-					resultData = getProcessedData(rs);
-				} else {
-					resultData = getQueryResultData(rs);
+				try {
+					if (wideRowSupport) {
+						resultData = getWideRowData(rs, wideRowGenerator);
+					} else if (resultPostProc != null) {
+						resultData = getProcessedData(rs);
+					} else {
+						resultData = getQueryResultData(rs);
+					}
+
+					resultData.setOutputExpression(!(resultPostProc instanceof Crosstab) && outputExpression);
+					long t3 = System.currentTimeMillis();
+					logger.debug("Data SQL: " + dataSql + "; Query Exec Time: " + (t2 - t1) + "; Result Prep Time: " + (t3 - t2));
+
+					QueryResponse resp = new QueryResponse();
+					resp.setSql(dataSql);
+					resp.setResultData(resultData);
+					resp.setExecutionTime(t2 - t1);
+					resp.setPostExecutionTime(t3 - t2);
+
+					Calendar cal = Calendar.getInstance();
+					cal.setTimeInMillis(t1);
+					resp.setTimeOfExecution(cal.getTime());
+					cleanupResultData = false;
+					return resp;
+				} finally {
+					if (cleanupResultData && resultData != null) {
+						resultData.close();
+					}
 				}
-
-				resultData.setOutputExpression(!(resultPostProc instanceof Crosstab) && outputExpression);
-				long t3 = System.currentTimeMillis();
-				logger.debug("Data SQL: " + dataSql + "; Query Exec Time: " + (t2 - t1) + "; Result Prep Time: " + (t3 - t2));
-
-				QueryResponse resp = new QueryResponse();
-				resp.setSql(dataSql);
-				resp.setResultData(resultData);
-				resp.setExecutionTime(t2 - t1);
-				resp.setPostExecutionTime(t3 - t2);
-
-				Calendar cal = Calendar.getInstance();
-				cal.setTimeInMillis(t1);
-				resp.setTimeOfExecution(cal.getTime());
-				cleanupResultData = false;
-				return resp;
-			} finally {
-				if (cleanupResultData && resultData != null) {
-					resultData.close();
-				}
+			});
+			cleanupWideRowGenerator = false;
+			return response;
+		} finally {
+			if (cleanupWideRowGenerator) {
+				wideRowGenerator.cleanup();
 			}
-        });
+		}
     }
 
     public String getDataSql() {
@@ -278,8 +326,22 @@ public class Query {
     }
     
     public String getDataSql(boolean wideRows, int start, int numRows) {
+		ShallowWideRowGenerator wideRowGenerator = wideRows
+			? wideRowGeneratorFactory.create(queryJoinTree, queryExpr, wideRowMode)
+			: null;
+		try {
+			return getDataSql(wideRows, start, numRows, wideRowGenerator);
+		} finally {
+			if (wideRowGenerator != null) {
+				wideRowGenerator.cleanup();
+			}
+		}
+	}
+
+	private String getDataSql(boolean wideRows, int start, int numRows, ShallowWideRowGenerator wideRowGenerator) {
         QueryGenerator gen = new QueryGenerator(wideRows, ic, dateFormat, timeFormat);
         gen.setAutoJoinParams(autoJoinParams);
+		gen.setWideRowOrderByEnabled(wideRowGenerator != null && wideRowGenerator.isOrderByRequired());
         return gen.getDataSql(queryExpr, queryJoinTree, start, numRows);        
     }
 
@@ -305,32 +367,15 @@ public class Query {
 		return result.sql();
 	}
 
-	private boolean isWideRowSupportEnabled() {
-		return
-			(wideRowMode != WideRowMode.OFF) &&
-			!queryExpr.isAggregateQuery() &&
-			!queryExpr.hasResultPostProc();
-	}
+    private QueryResultData getWideRowData(ResultSet rs, ShallowWideRowGenerator wideRowGenerator) {
+		wideRowGenerator.start();
+		int dbRowsCount = wideRowGenerator.processResultSet(rs);
+		wideRowGenerator.end();
 
-    private QueryResultData getWideRowData(ResultSet rs) {
-        ShallowWideRowGenerator wideRowGenerator = new ShallowWideRowGenerator(queryJoinTree, queryExpr, wideRowMode);
-	    boolean cleanupRowGenerator = true;
-
-		try {
-			wideRowGenerator.start();
-			int dbRowsCount = wideRowGenerator.processResultSet(rs);
-			wideRowGenerator.end();
-
-			QueryResultData qrd = getQueryResultData(wideRowGenerator.getResultColumns());
-			qrd.setDbRowsCount(dbRowsCount);
-			qrd.dataSource(wideRowGenerator);
-			cleanupRowGenerator = false;
-			return qrd;
-		} finally {
-			if (cleanupRowGenerator) {
-				wideRowGenerator.cleanup();
-			}
-		}
+		QueryResultData qrd = getQueryResultData(wideRowGenerator.getResultColumns());
+		qrd.setDbRowsCount(dbRowsCount);
+		qrd.dataSource(wideRowGenerator);
+		return qrd;
     }
     
     private QueryResultData getProcessedData(ResultSet rs) {

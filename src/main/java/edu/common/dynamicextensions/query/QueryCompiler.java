@@ -63,6 +63,8 @@ public class QueryCompiler {
 	private PathConfig pathConfig;
 
 	private QuerySpace qs;
+
+	private List<QueryTransformer> transformers = Collections.emptyList();
     
     public QueryCompiler(String rootFormName, String query) {
         this(rootFormName, query, null);
@@ -96,11 +98,20 @@ public class QueryCompiler {
     	return this;
 	}
 
+	public QueryCompiler transformers(List<QueryTransformer> transformers) {
+		this.transformers = transformers != null ? new ArrayList<>(transformers) : Collections.emptyList();
+		return this;
+	}
+
     public void compile() {
 		try {
 			QueryParser queryParser = new QueryParser(query);
 			queryExpr = queryParser.getQueryAst();
 			addRestrictions();
+			for (QueryTransformer transformer : transformers) {
+				queryExpr = transformer.transform(queryExpr);
+			}
+
 			queryJoinTree = buildJoinTree(queryExpr);
 		} catch (Exception e) {
 			logger.info("Error compiling query: " + query, e);

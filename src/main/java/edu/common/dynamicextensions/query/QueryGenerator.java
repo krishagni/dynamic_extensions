@@ -92,6 +92,8 @@ public class QueryGenerator {
 	};
 
 	private boolean wideRowSupport;
+
+	private boolean wideRowOrderByEnabled = true;
 	
 	private boolean ic;
 
@@ -120,6 +122,10 @@ public class QueryGenerator {
 
 	public void setAutoJoinParams(Map<String, String> autoJoinParams) {
 		this.autoJoinParams = autoJoinParams;
+	}
+
+	public void setWideRowOrderByEnabled(boolean wideRowOrderByEnabled) {
+		this.wideRowOrderByEnabled = wideRowOrderByEnabled;
 	}
 
 	public String getCountSql(QueryExpressionNode queryExpr, JoinTree joinTree) {
@@ -166,7 +172,7 @@ public class QueryGenerator {
 
 		String orderBy = null;
 		if (isWideRowSupport(queryExpr)) {
-			if (StringUtils.isBlank(groupBy)) {
+			if (wideRowOrderByEnabled && StringUtils.isBlank(groupBy)) {
 				orderBy = getWideRowRootOrderBy(queryExpr.getSelectList(), joinTree);
 			}
 		} else {

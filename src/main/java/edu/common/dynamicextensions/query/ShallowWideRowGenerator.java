@@ -21,7 +21,7 @@ import edu.common.dynamicextensions.query.cachestore.LinkedEhCacheMap;
 public class ShallowWideRowGenerator {
 	private static final LogUtil logger = LogUtil.getLogger(ShallowWideRowGenerator.class);
 
-    private LinkedEhCacheMap<String, WideRowNode> wideRows = new LinkedEhCacheMap<>();
+    protected LinkedEhCacheMap<String, WideRowNode> wideRows = new LinkedEhCacheMap<>();
     
     private Map<String, String[]> tabJoinPath = new HashMap<String, String[]>();
     
@@ -40,6 +40,8 @@ public class ShallowWideRowGenerator {
     private JoinTree queryJoinTree;
     
     private WideRowMode mode;
+
+	private volatile boolean cleanedUp;
         
     public ShallowWideRowGenerator(JoinTree queryJoinTree, QueryExpressionNode queryExpr) {
     	this(queryJoinTree, queryExpr, WideRowMode.DEEP);
@@ -56,14 +58,21 @@ public class ShallowWideRowGenerator {
     
         
     public void start() {
+		ensureUsable();
         wideRows.clear();
         aliasRowCountMap.clear();
         aliasRowCountMap.put(rootTabAlias, 1);    
         tabFieldsMap = getTabFieldsMap();
         lastRootId = null;
     }
+
+	public boolean isOrderByRequired() {
+		ensureUsable();
+		return true;
+	}
     
     public int processResultSet(ResultSet rs) {
+		ensureUsable();
     	int rowCount = 0;
         try {        	
             while (rs.next()) {
@@ -74,13 +83,13 @@ public class ShallowWideRowGenerator {
                 
                 String rootId = tabAliasIdMap.get(rootTabAlias);
                 WideRowNode rootTabRow = wideRows.get(rootId);
-                if (lastRootId == null || !lastRootId.equals(rootId)) {
+                if (shouldCreateRootRow(rootId, rootTabRow)) {
                     assert(rootTabRow == null);
                     rootTabRow = new WideRowNode(rootTabAlias, rootId);
                     rootTabRow.setColumns(tabAliasColValuesMap.get(rootTabAlias));
                     wideRows.put(rootId, rootTabRow);
                     if (lastRootId != null) {
-                    	mergeCounts(wideRows.get(lastRootId));
+						completeRootRow(lastRootId);
                     }                    
                 }
                 
@@ -124,12 +133,18 @@ public class ShallowWideRowGenerator {
     }
     
     public void end() {
+		ensureUsable();
     	if (lastRootId != null) {
-    		mergeCounts(wideRows.get(lastRootId));
+			completeRootRow(lastRootId);
     	}        
     }
     
-    public void cleanup() {
+	public synchronized void cleanup() {
+		if (cleanedUp) {
+			return;
+		}
+
+		cleanedUp = true;
 		try {
 			wideRows.destroy();
 		} catch (Exception e) {
@@ -138,9 +153,10 @@ public class ShallowWideRowGenerator {
     }
     
     public List<ResultColumn> getResultColumns() {
+		ensureUsable();
     	List<ResultColumn> columns = null;
     	
-    	Iterator<WideRowNode> iter = wideRows.iterator();
+		Iterator<WideRowNode> iter = wideRowIterator();
     	if (iter != null && iter.hasNext()) {
     		List<List<ResultColumn>> resultCols = iter.next().flatten(aliasRowCountMap, tabWideRowMode, tabFieldsMap);
     		columns = resultCols.iterator().next();
@@ -152,8 +168,9 @@ public class ShallowWideRowGenerator {
     }
     
     public Iterator<Object[]> iterator() {
+		ensureUsable();
     	return new Iterator<Object[]>() {
-    		private Iterator<WideRowNode> iterator = wideRows.iterator();
+			private Iterator<WideRowNode> iterator = wideRowIterator();
     		
     		private Iterator<Object[]> subRowIter = null;
     		
@@ -165,11 +182,13 @@ public class ShallowWideRowGenerator {
     		
 			@Override
 			public boolean hasNext() {			
+				ensureUsable();
 				return subRowIter != null;
 			}
 
 			@Override
 			public Object[] next() {
+				ensureUsable();
 				Object[] row = null;
 				if (subRowIter != null) {
 					row = subRowIter.next();
@@ -199,6 +218,31 @@ public class ShallowWideRowGenerator {
 			}
     	};
     }
+
+	protected void ensureUsable() {
+		if (cleanedUp) {
+			throw new IllegalStateException("Wide row generator has been cleaned up");
+		}
+	}
+
+	protected boolean shouldCreateRootRow(String rootId, WideRowNode rootRow) {
+		return lastRootId == null || !lastRootId.equals(rootId);
+	}
+
+	protected void completeRootRow(String rootId) {
+		mergeCounts(wideRows.get(rootId));
+	}
+
+	protected void completeRootRows() {
+		Iterator<WideRowNode> iter = wideRowIterator();
+		while (iter != null && iter.hasNext()) {
+			mergeCounts(iter.next());
+		}
+	}
+
+	protected Iterator<WideRowNode> wideRowIterator() {
+		return wideRows.iterator();
+	}
     
     private List<Object[]> flattenedRows(WideRowNode wideRow) {
     	List<Object[]> result = new ArrayList<Object[]>();
