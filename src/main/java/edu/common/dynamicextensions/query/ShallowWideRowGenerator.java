@@ -12,16 +12,21 @@ import edu.common.dynamicextensions.domain.nui.LookupControl;
 import edu.common.dynamicextensions.domain.nui.MultiSelectControl;
 import edu.common.dynamicextensions.napi.FormException;
 import edu.common.dynamicextensions.ndao.DbSettingsFactory;
+import edu.common.dynamicextensions.nutility.DeConfiguration;
 import edu.common.dynamicextensions.nutility.LogUtil;
 import edu.common.dynamicextensions.query.ast.ExpressionNode;
 import edu.common.dynamicextensions.query.ast.FieldNode;
 import edu.common.dynamicextensions.query.ast.QueryExpressionNode;
-import edu.common.dynamicextensions.query.cachestore.LinkedEhCacheMap;
+import edu.common.dynamicextensions.query.store.ResultStore;
+import edu.common.dynamicextensions.query.store.SpillableResultStore;
 
 public class ShallowWideRowGenerator {
 	private static final LogUtil logger = LogUtil.getLogger(ShallowWideRowGenerator.class);
 
-    protected LinkedEhCacheMap<String, WideRowNode> wideRows = new LinkedEhCacheMap<>();
+    protected Map<String, WideRowNode> wideRows = new LinkedHashMap<>();
+
+    private ResultStore<WideRowNode> completedWideRows =
+        new SpillableResultStore<>(DeConfiguration.getInstance().maxResultStoreValuesInMemory());
     
     private Map<String, String[]> tabJoinPath = new HashMap<String, String[]>();
     
@@ -60,6 +65,7 @@ public class ShallowWideRowGenerator {
     public void start() {
 		ensureUsable();
         wideRows.clear();
+        completedWideRows.clear();
         aliasRowCountMap.clear();
         aliasRowCountMap.put(rootTabAlias, 1);    
         tabFieldsMap = getTabFieldsMap();
@@ -89,7 +95,7 @@ public class ShallowWideRowGenerator {
                     rootTabRow.setColumns(tabAliasColValuesMap.get(rootTabAlias));
                     wideRows.put(rootId, rootTabRow);
                     if (lastRootId != null) {
-						completeRootRow(lastRootId);
+						finalizeRootOnTransition(lastRootId);
                     }                    
                 }
                 
@@ -146,7 +152,8 @@ public class ShallowWideRowGenerator {
 
 		cleanedUp = true;
 		try {
-			wideRows.destroy();
+			wideRows.clear();
+			completedWideRows.close();
 		} catch (Exception e) {
 			logger.error("Error destroying wide-rows cache", e);
 		}
@@ -230,18 +237,32 @@ public class ShallowWideRowGenerator {
 	}
 
 	protected void completeRootRow(String rootId) {
-		mergeCounts(wideRows.get(rootId));
+		WideRowNode wideRow = wideRows.remove(rootId);
+		if (wideRow == null) {
+			return;
+		}
+
+		mergeCounts(wideRow);
+		completedWideRows.add(wideRow);
+	}
+
+	//
+	// Finalizes the previous root when processing advances to another root. The
+	// shallow generator receives rows ordered by root ID, so no more rows can be
+	// added to the previous root after this transition.
+	//
+	protected void finalizeRootOnTransition(String rootId) {
+		completeRootRow(rootId);
 	}
 
 	protected void completeRootRows() {
-		Iterator<WideRowNode> iter = wideRowIterator();
-		while (iter != null && iter.hasNext()) {
-			mergeCounts(iter.next());
+		for (String rootId : new ArrayList<>(wideRows.keySet())) {
+			completeRootRow(rootId);
 		}
 	}
 
 	protected Iterator<WideRowNode> wideRowIterator() {
-		return wideRows.iterator();
+		return completedWideRows.iterator();
 	}
     
     private List<Object[]> flattenedRows(WideRowNode wideRow) {

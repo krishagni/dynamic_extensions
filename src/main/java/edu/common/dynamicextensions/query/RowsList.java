@@ -3,23 +3,29 @@ package edu.common.dynamicextensions.query;
 import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicInteger;
 
-
+import edu.common.dynamicextensions.nutility.DeConfiguration;
 import edu.common.dynamicextensions.nutility.LogUtil;
-import edu.common.dynamicextensions.query.cachestore.LinkedEhCacheMap;
+import edu.common.dynamicextensions.query.store.ResultStore;
+import edu.common.dynamicextensions.query.store.SpillableResultStore;
 
 public class RowsList {
 	private static final LogUtil logger = LogUtil.getLogger(RowsList.class);
 
 	private static final AtomicInteger openCount = new AtomicInteger(0);
 
-	private LinkedEhCacheMap<Integer, Object[]> rows = new LinkedEhCacheMap<>();
+	private ResultStore<Object[]> rows;
 
 	public RowsList() {
+		this(new SpillableResultStore<>(DeConfiguration.getInstance().maxResultStoreValuesInMemory()));
+	}
+
+	public RowsList(ResultStore<Object[]> rows) {
+		this.rows = rows;
 		logger.info("Create: Open rows list: " + openCount.incrementAndGet());
 	}
 
 	public void add(Object[] row) {
-		rows.put(rows.size(), row);
+		rows.add(row);
 	}
 
 	public int size() {
@@ -36,7 +42,7 @@ public class RowsList {
 		}
 
 		try {
-			rows.destroy();
+			rows.close();
 			rows = null;
 			logger.info("Destruct: Open rows list: " + openCount.decrementAndGet());
 		} catch (Exception e) {

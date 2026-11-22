@@ -20,7 +20,7 @@ public class DeConfiguration {
 
 	private String timeFormat = "HH:mm";
 
-	private int maxCacheElementsInMemory = 100;
+	private int maxResultStoreValuesInMemory = 100;
 
 	private DeConfiguration() {
 
@@ -71,11 +71,19 @@ public class DeConfiguration {
 	}
 
 	public int maxCacheElementsInMemory() {
-		return maxCacheElementsInMemory;
+		return maxResultStoreValuesInMemory();
 	}
 
 	public DeConfiguration maxCacheElementsInMemory(int maxCacheElementsInMemory) {
-		this.maxCacheElementsInMemory = maxCacheElementsInMemory;
+		return maxResultStoreValuesInMemory(maxCacheElementsInMemory);
+	}
+
+	public int maxResultStoreValuesInMemory() {
+		return maxResultStoreValuesInMemory;
+	}
+
+	public DeConfiguration maxResultStoreValuesInMemory(int maxResultStoreValuesInMemory) {
+		this.maxResultStoreValuesInMemory = maxResultStoreValuesInMemory;
 		return this;
 	}
 }
