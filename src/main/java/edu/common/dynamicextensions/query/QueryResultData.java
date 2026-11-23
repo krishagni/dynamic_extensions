@@ -212,12 +212,20 @@ public class QueryResultData {
 	}
        
     public void dataSource(ResultSet rs) {
+		dataSource(rs, new RowsList());
+	}
+
+	public void dataSource(ResultSet rs, int maxValuesInMemory) {
+		dataSource(rs, new RowsList(maxValuesInMemory));
+	}
+
+	public void dataSource(ResultSet rs, RowsList rowsList) {
     	if (this.rows != null) {
     		this.rows.cleanup();
     		this.rows = null;
 		}
 
-    	this.rows = new RowsList();
+		this.rows = rowsList;
 		Map<Integer, BigDecimal> cumulative = new HashMap<>();
     	try {
         	int columnCount = rs.getMetaData().getColumnCount();
@@ -289,12 +297,12 @@ public class QueryResultData {
 
     	this.dbRowsCount = this.rows.size();
     }
-    
-    public void dataSource(ShallowWideRowGenerator rowGen) {
-    	this.rowGen = rowGen;
-    }
 
-    public List<Object[]> getRows() {
+	public void dataSource(ShallowWideRowGenerator rowGen) {
+		this.rowGen = rowGen;
+	}
+
+	public List<Object[]> getRows() {
 		Iterator<Object[]> iter = null;
 		if (rows != null) {
 			iter = rowIterator(rows.iterator());
@@ -308,7 +316,7 @@ public class QueryResultData {
 		}
 
 		return result;
-    }
+	}
 
 	public boolean isOutputExpression() {
 		return outputExpression;

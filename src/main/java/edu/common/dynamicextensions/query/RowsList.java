@@ -16,7 +16,11 @@ public class RowsList {
 	private ResultStore<Object[]> rows;
 
 	public RowsList() {
-		this(new SpillableResultStore<>(DeConfiguration.getInstance().maxResultStoreValuesInMemory()));
+		this(DeConfiguration.getInstance().maxResultStoreValuesInMemory());
+	}
+
+	public RowsList(int maxValuesInMemory) {
+		this(new SpillableResultStore<>(maxValuesInMemory));
 	}
 
 	public RowsList(ResultStore<Object[]> rows) {

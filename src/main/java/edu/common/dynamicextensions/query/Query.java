@@ -60,6 +60,8 @@ public class Query {
 
 	private DataSource dataSource;
 
+	private Integer maxResultStoreValuesInMemory;
+
 	private QueryRiskAssessor riskAssessor;
 
 	private QueryRiskAssessmentConfig riskAssessmentConfig;
@@ -146,6 +148,11 @@ public class Query {
 
 	public Query dataSource(DataSource dataSource) {
 		this.dataSource = dataSource;
+		return this;
+	}
+
+	public Query maxResultStoreValuesInMemory(int maxResultStoreValuesInMemory) {
+		this.maxResultStoreValuesInMemory = maxResultStoreValuesInMemory;
 		return this;
 	}
 
@@ -406,7 +413,12 @@ public class Query {
 
     private QueryResultData getQueryResultData(ResultSet rs) {
         QueryResultData queryResult = getQueryResultData(getResultColumns(queryExpr));
-        queryResult.dataSource(rs);
+		if (maxResultStoreValuesInMemory != null) {
+			queryResult.dataSource(rs, maxResultStoreValuesInMemory);
+		} else {
+			queryResult.dataSource(rs);
+		}
+
         return queryResult;
     }
 
