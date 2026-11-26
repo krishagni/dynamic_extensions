@@ -1,17 +1,21 @@
 package edu.common.dynamicextensions.ndao;
 
+import java.lang.reflect.Method;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.List;
 
 import javax.sql.DataSource;
 
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.PreparedStatementCreator;
 import org.springframework.jdbc.core.ResultSetExtractor;
+import org.springframework.jdbc.datasource.DataSourceUtils;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 
@@ -74,6 +78,39 @@ public class JdbcDao {
 		jdbcTemplate.execute(ddl);		
 		// TODO: DDL are transactions on their own. How to deal with this.		
 	}
+
+	public void executeDDLWithoutForeignKeyChecks(String ddl) {
+		jdbcTemplate.execute((ConnectionCallback<Void>) conn -> {
+			int foreignKeyChecks = getForeignKeyChecks(conn);
+			Exception ddlError = null;
+
+			try {
+				executeDDL(conn, "SET FOREIGN_KEY_CHECKS = 0");
+				executeDDL(conn, ddl);
+			} catch (SQLException | RuntimeException t) {
+				ddlError = t;
+				throw t;
+			} finally {
+				try {
+					executeDDL(conn, "SET FOREIGN_KEY_CHECKS = " + foreignKeyChecks);
+				} catch (SQLException | RuntimeException restoreError) {
+					invalidateConnection(conn, restoreError);
+					if (ddlError != null) {
+						ddlError.addSuppressed(restoreError);
+					} else {
+						throw restoreError;
+					}
+				}
+			}
+
+			return null;
+		});
+	}
+
+	public boolean hasMoreRowsThan(String tableName, int rowCount) {
+		String query = String.format("SELECT 1 FROM %s LIMIT 1 OFFSET %d", tableName, rowCount);
+		return getResultSet(query, null, ResultSet::next);
+	}
 	
 	public Long getNextId(String tableName) {
 		return IdGenerator.getInstance().getNextId(tableName);
@@ -81,5 +118,52 @@ public class JdbcDao {
 	
 	public int[] batchUpdate(final String sql, final List<Object[]> records) {
 		return jdbcTemplate.batchUpdate(sql, records);
+	}
+
+	private int getForeignKeyChecks(Connection conn) throws SQLException {
+		try (
+			Statement stmt = conn.createStatement();
+			ResultSet rs = stmt.executeQuery("SELECT @@FOREIGN_KEY_CHECKS")
+		) {
+			rs.next();
+			return rs.getInt(1);
+		}
+	}
+
+	private void executeDDL(Connection conn, String ddl) throws SQLException {
+		try (Statement stmt = conn.createStatement()) {
+			stmt.execute(ddl);
+		}
+	}
+
+	private void invalidateConnection(Connection conn, Exception restoreError) {
+		Connection targetConn = DataSourceUtils.getTargetConnection(conn);
+		boolean discarded = discardTomcatConnection(targetConn, restoreError);
+		if (!discarded) {
+			try {
+				targetConn.abort(Runnable::run);
+			} catch (SQLException | RuntimeException abortError) {
+				restoreError.addSuppressed(abortError);
+			}
+		}
+
+		try {
+			targetConn.close();
+		} catch (SQLException | RuntimeException closeError) {
+			restoreError.addSuppressed(closeError);
+		}
+	}
+
+	private boolean discardTomcatConnection(Connection conn, Exception restoreError) {
+		try {
+			Class<?> pooledConnectionClass = Class.forName("org.apache.tomcat.jdbc.pool.PooledConnection");
+			Object pooledConnection = conn.unwrap(pooledConnectionClass);
+			Method setDiscarded = pooledConnectionClass.getMethod("setDiscarded", boolean.class);
+			setDiscarded.invoke(pooledConnection, true);
+			return true;
+		} catch (ReflectiveOperationException | SQLException | RuntimeException e) {
+			restoreError.addSuppressed(e);
+			return false;
+		}
 	}
 }

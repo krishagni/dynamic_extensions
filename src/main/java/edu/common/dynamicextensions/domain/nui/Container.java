@@ -40,6 +40,7 @@ import edu.common.dynamicextensions.napi.FormEventsNotifier;
 import edu.common.dynamicextensions.napi.FormException;
 import edu.common.dynamicextensions.ndao.ColumnTypeHelper;
 import edu.common.dynamicextensions.ndao.ContainerDao;
+import edu.common.dynamicextensions.ndao.DbSettingsFactory;
 import edu.common.dynamicextensions.ndao.JdbcDao;
 import edu.common.dynamicextensions.ndao.JdbcDaoFactory;
 import edu.common.dynamicextensions.ndao.TransactionManager;
@@ -68,6 +69,8 @@ public class Container implements Serializable {
 	private static final String CREATE_MS_UNIQUE_IDX_DDL = "create unique index %s_UQ on %s(RECORD_ID, VALUE)";
 
 	private static final String ADD_FK = "alter table %s add constraint %s foreign key (%s) references %s(%s)";
+
+	private static final int FK_CHECKS_DISABLE_ROW_THRESHOLD = 500_000;
 
 	private static final ThreadLocal<Boolean> selectToLookupConversion = ThreadLocal.withInitial(() -> false);
 			
@@ -1447,23 +1450,68 @@ public class Container implements Serializable {
 		addFks(jdbcDao, tableName, columnDefs);
 	}
 
+	//
+	// This method is called only for newly created columns. Therefore, the
+	// referring columns cannot contain non-null values at this point.
+	//
 	private void addFks(JdbcDao jdbcDao, String tableName, List<ColumnDef> columnDefs) {
+		Boolean disableForeignKeyChecks = null;
+
 		for (ColumnDef def : columnDefs) {
 			if (def.getRefTable() == null || def.getRefColumn() == null) {
 				continue;
 			}
 
+			if (disableForeignKeyChecks == null) {
+				disableForeignKeyChecks = isDisableForeignKeyChecks(jdbcDao, tableName);
+			}
+
 			try {
-				jdbcDao.executeDDL(String.format(
-					ADD_FK, tableName, "FK_" + tableName + "_" + def.getColumnName(), def.getColumnName(),
-					def.getRefTable(), def.getRefColumn()
-				));
-			} catch (Throwable t) {
-				logger.error("Error adding foreign key", t);
+				jdbcDao.executeDDL(
+					String.format(
+						CREATE_IDX_DDL,
+						tableName, def.getColumnName() + "_ID", // index name
+						tableName,                              // table and
+						def.getColumnName()                     // column on which index is being added
+					)
+				);
+			} catch (RuntimeException e) {
+				logger.error("Error adding index for foreign key", e);
+			}
+
+			try {
+				String addFkDdl = String.format(
+					ADD_FK,
+					tableName,                                     // table on which FK is being added
+					"FK_" + tableName + "_" + def.getColumnName(), // FK constraint name
+					def.getColumnName(),                           // referring column
+					def.getRefTable(), def.getRefColumn()          // referred table and column
+				);
+
+				if (disableForeignKeyChecks) {
+					jdbcDao.executeDDLWithoutForeignKeyChecks(addFkDdl);
+				} else {
+					jdbcDao.executeDDL(addFkDdl);
+				}
+			} catch (RuntimeException e) {
+				logger.error("Error adding foreign key", e);
 			}
 		}
 	}
-	
+
+	private static boolean isDisableForeignKeyChecks(JdbcDao jdbcDao, String tableName) {
+		boolean disableForeignKeyChecks = false;
+		if (DbSettingsFactory.isMySQL()) {
+			try {
+				disableForeignKeyChecks = jdbcDao.hasMoreRowsThan(tableName, FK_CHECKS_DISABLE_ROW_THRESHOLD);
+			} catch (RuntimeException e) {
+				logger.error("Error determining whether foreign key checks should be disabled", e);
+			}
+		}
+
+		return disableForeignKeyChecks;
+	}
+
 	private void add(List<Control> list, Control ctrl) {
 		list.add(ctrl);
 	}
